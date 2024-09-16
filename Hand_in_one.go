@@ -26,8 +26,9 @@ func main() {
 	go fork(3)
 	go fork(4)
 
+	// The main function loops until all philosophers have eaten 3 times or more
 	for amountDoneEating < 6 {
-		if amountDoneEating >= 5 {
+		if amountDoneEating >= 5 { // Once 5 philosophers have eaten 3 times
 			fmt.Println("Everyone has now eaten 3 or more times")
 			return
 		}
@@ -39,12 +40,16 @@ func filo(forkNum1 int, forkNum2 int, filoNum int) {
 	for {
 		left := 0
 		right := 0
+		// Alternate fork acquisition order to prevent deadlock
+		// Odd-numbered philosophers pick up the left fork first, then the right fork
+		// Even-numbered philosophers pick up the right fork first, then the left fork
+		// This breaks the circular wait condition that can cause deadlock
 		if filoNum%2 == 1 {
-			left = <-chans[forkNum1]
-			right = <-chans[forkNum2]
+			left = <-chans[forkNum1]  // Pick up left fork
+			right = <-chans[forkNum2] // Pick up right fork
 		} else {
-			right = <-chans[forkNum2]
-			left = <-chans[forkNum1]
+			right = <-chans[forkNum2] // Pick up right fork
+			left = <-chans[forkNum1]  // Pick up left fork
 		}
 
 		if left == 0 && right == 0 {
@@ -52,18 +57,19 @@ func filo(forkNum1 int, forkNum2 int, filoNum int) {
 			chans[forkNum2] <- 1
 			timesEaten++
 			fmt.Println("Philosopher", filoNum, "is eating")
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			//Checks if the phiolsopher has eaten 3 times
 			if timesEaten == 3 {
-				amountDoneEating++
+				amountDoneEating++ // Increase the global counter if philosopher eats 3 times
 			}
 
 			fmt.Println("Philosopher", filoNum, "is thinking")
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
-		chans[forkNum1] <- left
-		chans[forkNum2] <- right
+		// Release the forks by putting them back in the channels
+		chans[forkNum1] <- left  // Release left fork
+		chans[forkNum2] <- right // Release right fork
 	}
 }
 
