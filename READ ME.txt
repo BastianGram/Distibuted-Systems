@@ -1,0 +1,33 @@
+a) What are packages in your implementation? What data structure do you use 
+to transmit data and meta-data?
+
+- We are using "fmt" for printing to the terminal and "time" for giving our go 
+routines times to finish. 
+We use a single channel to store meta-data about the handshakes progress.
+
+b) Does your implementation use threads or processes? Why is it not realistic to use threads?
+
+- We use two threads to represent the client and the server. It is not realistic to do this
+because a thread shares the same memory and variables access. The actual handshakes uses memory
+from two separate systems (an computer and a server). A process ensures that the memory is not shared.
+
+c) In case the network changes the order in which messages are delivered,
+how would you handle message re-ordering?
+
+- The message includes a sequence number, a message which is meant to arrive before another
+message will have the lower sequence number. When the messages arrive they are simply
+ordered based on their sequence number.
+
+d) In case messages can be delayed or lost, how does your implementation handle message loss?
+
+- Since our implementation only solves task (1) we do not handle message lost. To handle message
+loss we could have implemented a feature that retries any failed message until it succeeds or
+times out (e.g after 120 seconds).
+
+e) Why is the 3-way handshake important?
+
+- It is a connection-oriented process, which ensure that a client and a server can transmit information
+quickly while keeping order. It transmits quickly, since multiple processes are running simultaneously.
+Tracking sequence and acknowledgement numbers ensures that communication is correctly ordered.
+
+
