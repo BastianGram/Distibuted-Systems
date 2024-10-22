@@ -1,6 +1,8 @@
 //version 1.0
 syntax = "proto3";
 
+option go_package = "github.com/BastianGram/Distibuted-Systems/tree/Handin3/Hand_in_3/invoicer";
+
 package chittychat;
 
 service ChittyChat {
