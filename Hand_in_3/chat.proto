@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package chat;
+
+
+message ClientPublish {
+    string message = 1;
+}
+
+message ServerBroadcast {
+    string message = 1;
+    uint32 lamport = 2;
+}
+
+
+
+service Chatservice {
+    rpc ApproveClient(ServerBroadcast) returns (ServerBroadcast) {}
+
+    rpc PublishMessage(ClientPublish) returns (ClientPublish) {}
+}
