@@ -1,0 +1,36 @@
+syntax = "proto3";
+option go_package = "grpc/proto";
+
+message JoinRequest {
+  string name = 1;
+}
+
+message JoinResponce {
+  string name = 1;
+}
+
+message ServerBroadcast {
+    string message = 1;
+    string clientName = 2;
+}
+
+message BroadcastRequest {
+    string message = 1;
+    string clientName = 2;
+}
+
+message ClientLeaves {
+    string clientName = 1;
+}
+
+message ServerClientLeaves {
+    string clientName = 1;
+}
+
+service ITUDatabase {
+    rpc Join(JoinRequest) returns(JoinResponce) {};
+
+    rpc Broadcast(BroadcastRequest) returns(ServerBroadcast) {};
+
+    rpc ClientLeaving(ClientLeaves) returns(ServerClientLeaves) {};
+}
