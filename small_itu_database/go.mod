@@ -1,4 +1,4 @@
-module github.com/BastianGram/Distibuted-Systems/tree/Handin3/Hand_in_3
+module github.com/BastianGram/Distibuted-Systems/tree/handin3v2/small_itu_database
 
 go 1.23.1
 

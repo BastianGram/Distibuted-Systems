@@ -1,6 +1,7 @@
 package main
 
 import (
+	//"proto"
 	"context"
 	"encoding/csv"
 	"fmt"
@@ -8,12 +9,12 @@ import (
 	"net"
 	"os"
 
+	pb "github.com/BastianGram/Distibuted-Systems/tree/handin3v2/small_itu_database/grpc"
 	"google.golang.org/grpc"
-	pb "github.com/BastianGram/Distibuted-Systems/tree/Handin3/small_itu_database/grpc"
 )
 
 type ITU_databaseServer struct {
-	proto.UnimplementedITUDatabaseServer
+	pb.UnimplementedITUDatabaseServer
 	students []string
 }
 
