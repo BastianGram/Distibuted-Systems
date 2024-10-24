@@ -28,7 +28,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ITUDatabaseClient interface {
-	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponce, error)
+	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
 	Broadcast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*ServerBroadcast, error)
 	ClientLeaving(ctx context.Context, in *ClientLeaves, opts ...grpc.CallOption) (*ServerClientLeaves, error)
 }
@@ -41,9 +41,9 @@ func NewITUDatabaseClient(cc grpc.ClientConnInterface) ITUDatabaseClient {
 	return &iTUDatabaseClient{cc}
 }
 
-func (c *iTUDatabaseClient) Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponce, error) {
+func (c *iTUDatabaseClient) Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JoinResponce)
+	out := new(JoinResponse)
 	err := c.cc.Invoke(ctx, ITUDatabase_Join_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *iTUDatabaseClient) ClientLeaving(ctx context.Context, in *ClientLeaves,
 // All implementations must embed UnimplementedITUDatabaseServer
 // for forward compatibility.
 type ITUDatabaseServer interface {
-	Join(context.Context, *JoinRequest) (*JoinResponce, error)
+	Join(context.Context, *JoinRequest) (*JoinResponse, error)
 	Broadcast(context.Context, *BroadcastRequest) (*ServerBroadcast, error)
 	ClientLeaving(context.Context, *ClientLeaves) (*ServerClientLeaves, error)
 	mustEmbedUnimplementedITUDatabaseServer()
@@ -88,7 +88,7 @@ type ITUDatabaseServer interface {
 // pointer dereference when methods are called.
 type UnimplementedITUDatabaseServer struct{}
 
-func (UnimplementedITUDatabaseServer) Join(context.Context, *JoinRequest) (*JoinResponce, error) {
+func (UnimplementedITUDatabaseServer) Join(context.Context, *JoinRequest) (*JoinResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
 func (UnimplementedITUDatabaseServer) Broadcast(context.Context, *BroadcastRequest) (*ServerBroadcast, error) {
