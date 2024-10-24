@@ -31,7 +31,7 @@ var CLINR int = 100
 func (s *server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponse, error) {
 	//CLINR is the clientID
 	CLINR++
-	
+
 	lamport++
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -39,7 +39,7 @@ func (s *server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.JoinRespons
 	// Add the client to the map
 	client := &Client{Name: strconv.Itoa(CLINR)}
 	s.clients[client.Name] = client
-	
+
 	log.Printf("Client logged as: %s", client.Name)
 
 	return &pb.JoinResponse{
@@ -58,13 +58,12 @@ func (s *server) ClientLeaving(ctx context.Context, req *pb.ClientLeaves) (*pb.S
 	// Remove the client from the map
 	if _, exists := s.clients[req.GetClientName()]; exists {
 		delete(s.clients, req.GetClientName())
-		log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + ", " + "Client disconnected: %s", req.GetClientName())
-		
+		log.Printf("Lamport: "+strconv.Itoa(int(lamport))+", "+"Client disconnected: %s", req.GetClientName())
 
 		return &pb.ServerClientLeaves{
 			LamportTime: lamport,
-			ClientName: req.ClientName,
-			}, nil
+			ClientName:  req.ClientName,
+		}, nil
 	}
 
 	return &pb.ServerClientLeaves{ClientName: "Client not found."}, nil
@@ -81,8 +80,8 @@ func (s *server) Broadcast(ctx context.Context, req *pb.BroadcastRequest) (*pb.S
 
 	return &pb.ServerBroadcast{
 		LamportTime: lamport,
-		Message: req.GetMessage(),
-		ClientName: req.GetClientName(),
+		Message:     req.GetMessage(),
+		ClientName:  req.GetClientName(),
 	}, nil
 
 	//code to broadcast to every client

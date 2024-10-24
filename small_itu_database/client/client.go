@@ -26,7 +26,7 @@ func main() {
 	}
 
 	client := pb.NewITUDatabaseClient(conn)
-
+	
 	// Prepare request
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -56,7 +56,7 @@ func main() {
 	for {
 		// Read user input
 		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan() // use `for scanner.Scan()` to keep reading
+		scanner.Scan() // use for scanner.Scan() to keep reading
 		input = scanner.Text()
 		lamport++
 		// If user types "disconnect", call the disconnect method
