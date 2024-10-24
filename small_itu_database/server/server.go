@@ -1,25 +1,113 @@
 package main
 
 import (
-	//"proto"
 	"context"
-	"encoding/csv"
-	"fmt"
 	"log"
 	"net"
-	"os"
+	"strconv"
+	"sync"
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/handin3v2/small_itu_database/grpc"
 	"google.golang.org/grpc"
 )
 
-type ITU_databaseServer struct {
-	pb.UnimplementedITUDatabaseServer
-	students []string
+var timestamp = 0
+
+type Client struct {
+	Name string
 }
 
-func (s *ITU_databaseServer) GetStudents(ctx context.Context, in *proto.Empty) (*proto.Students, error) {
-	return &proto.Students{Students: s.students}, nil
+// Server struct to implement the MyServiceServer interface
+type server struct {
+	pb.UnimplementedITUDatabaseServer
+	clients map[string]*Client
+	mu      sync.Mutex // to protect access to clients map
+}
+
+// client id:
+var CLINR int = 100
+
+// Join method implementation
+func (s *server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponce, error) {
+	//CLINR is the clientID
+	CLINR++
+	
+	timestamp++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Add the client to the map
+	client := &Client{Name: strconv.Itoa(CLINR)}
+	s.clients[client.Name] = client
+	
+	log.Printf("Client joined with request: %s", req.GetName())
+	log.Printf("Client logged as: %s", client.Name)
+
+	//converts timestamp to string
+	timestampStr := strconv.Itoa(timestamp)
+	return &pb.JoinResponce{Name: "Welcome client nr. " + strconv.Itoa(CLINR) + " Lamport timestamp: " + timestampStr}, nil
+}
+
+// Disconnect method implementation
+func (s *server) ClientLeaving(ctx context.Context, req *pb.ClientLeaves) (*pb.ServerClientLeaves, error) {
+	timestamp++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Remove the client from the map
+	if _, exists := s.clients[req.GetClientName()]; exists {
+		delete(s.clients, req.GetClientName())
+		log.Printf("Client disconnected: %s", req.GetClientName())
+
+		//converts timestamp to string
+		timestampStr := strconv.Itoa(timestamp)
+
+		return &pb.ServerClientLeaves{ClientName: "Goodbye " + req.GetClientName() + "! Lamport timestamp: " + timestampStr}, nil
+	}
+
+	return &pb.ServerClientLeaves{ClientName: "Client not found."}, nil
+}
+
+// SendMessage method implementation
+func (s *server) Broadcast(ctx context.Context, req *pb.BroadcastRequest) (*pb.ServerBroadcast, error) {
+	timestamp++
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Log the received message from the client
+	log.Printf("Message from %s: %s", req.GetClientName(), req.GetMessage())
+
+	//converts timestamp to string
+	timestampStr := strconv.Itoa(timestamp)
+
+	return &pb.ServerBroadcast{Message: "Message received from " + req.GetClientName() + "!" + ", Message: " + req.GetMessage() + "! Lamport timestamp: " + timestampStr}, nil
+}
+
+func main() {
+	// Initialize the server
+	s := &server{clients: make(map[string]*Client)}
+
+	// Create a listener on TCP port 5050
+	lis, err := net.Listen("tcp", ":5050")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	// Create a new gRPC server
+	grpcServer := grpc.NewServer()
+	pb.RegisterITUDatabaseServer(grpcServer, s)
+
+	log.Println("Server started. Listening on port 5050.")
+
+	// Start the server
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
+/*
+func (s *ITU_databaseServer) GetStudents(ctx context.Context, in *pb.Empty) (*pb.Students, error) {
+	return &pb.Students{Students: s.students}, nil
 }
 
 func main() {
@@ -75,3 +163,4 @@ func (s *ITU_databaseServer) start_server() {
 	}
 
 }
+*/
