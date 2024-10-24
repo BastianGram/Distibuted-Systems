@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/handin3v2/small_itu_database/grpc"
 	"google.golang.org/grpc"
@@ -20,7 +20,9 @@ type Client struct {
 // Server struct to implement the MyServiceServer interface
 type server struct {
 	pb.UnimplementedITUDatabaseServer
-	clients map[string]*Client
+	clients map[string]pb.ITUDatabase_BroadcastServer
+
+	//clients map[string]*Client
 	mu      sync.Mutex // to protect access to clients map
 }
 
@@ -28,68 +30,126 @@ type server struct {
 var CLINR int = 100
 
 // Join method implementation
-func (s *server) Join(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponse, error) {
+func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServer) (error) {
 	//CLINR is the clientID
 	CLINR++
 
-	lamport++
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if (req.LamportTime > lamport) {
+		lamport = req.LamportTime + 1
+	} else {
+		lamport++
+	}
 
-	// Add the client to the map
-	client := &Client{Name: strconv.Itoa(CLINR)}
-	s.clients[client.Name] = client
+	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Client nr. " + strconv.Itoa(CLINR) + " joined")
 
-	log.Printf("Client logged as: %s", client.Name)
-
-	return &pb.JoinResponse{
+	// Create the event notification
+	notification := &pb.ServerMessage{
 		LamportTime: lamport,
-		Name:        strconv.Itoa(CLINR),
-		Approved:    "Welcome " + strconv.Itoa(CLINR),
-	}, nil
+		ClientName: strconv.Itoa(CLINR),
+		Message: "Welcome " + strconv.Itoa(CLINR),
+	}
+
+	// Broadcast the event to all subscribed clients 
+	// Adding a goroutine around the code to allow the client to join the notification stream
+	go func() {
+		//buffering mechanism
+		time.Sleep(100 * time.Millisecond)
+		for clientId, observer := range s.clients {
+			err := observer.Send(notification)
+			if err != nil {
+				log.Printf("Error sending event to client %s: %v", clientId, err)
+				delete(s.clients, clientId) // Remove disconnected client
+			}
+		}
+	}()
+	
+	s.mu.Lock()
+	s.clients[strconv.Itoa(CLINR)] = stream
+	s.mu.Unlock()
+
+	<-stream.Context().Done()
+
+	// Remove the client when disconnected
+	s.mu.Lock()
+	delete(s.clients, strconv.Itoa(CLINR))
+	s.mu.Unlock()
+
+	return nil
+
 }
 
 // Disconnect method implementation
-func (s *server) ClientLeaving(ctx context.Context, req *pb.ClientLeaves) (*pb.ServerClientLeaves, error) {
-	lamport++
+func (s *server) ClientLeaving(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServer) (error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Remove the client from the map
-	if _, exists := s.clients[req.GetClientName()]; exists {
-		delete(s.clients, req.GetClientName())
-		log.Printf("Lamport: "+strconv.Itoa(int(lamport))+", "+"Client disconnected: %s", req.GetClientName())
+	if (req.LamportTime > lamport) {
+		lamport = req.LamportTime + 1
+	} else {
+		lamport++
+	}
+	// Log the received message from the client
+	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " client nr." + req.GetClientName() + " has left the session" )
 
-		return &pb.ServerClientLeaves{
-			LamportTime: lamport,
-			ClientName:  req.ClientName,
-		}, nil
+	// Create the event notification
+	notification := &pb.ServerMessage{
+		LamportTime: lamport,
+		ClientName: req.ClientName,
+		Message: "Client leaving, ID: " + req.ClientName,
 	}
 
-	return &pb.ServerClientLeaves{ClientName: "Client not found."}, nil
+	// Broadcast the event to all subscribed clients 
+	for clientId, observer := range s.clients {
+		err := observer.Send(notification)
+		if err != nil {
+			log.Printf("Error sending event to client %s: %v", clientId, err)
+			delete(s.clients, clientId) // Remove disconnected client
+		}
+	}
+
+	// Remove the client from the map
+	s.mu.Lock()
+	delete(s.clients, strconv.Itoa(CLINR))
+	s.mu.Unlock()
+
+	return nil
 }
 
 // SendMessage method implementation
-func (s *server) Broadcast(ctx context.Context, req *pb.BroadcastRequest) (*pb.ServerBroadcast, error) {
-	lamport++
+func (s *server) Broadcast(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServer) (error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if (req.LamportTime > lamport) {
+		lamport = req.LamportTime + 1
+	} else {
+		lamport++
+	}
+
 	// Log the received message from the client
-	log.Printf("Message from %s: %s", req.GetClientName(), req.GetMessage())
+	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Message: "  + req.Message + " recieved from client nr. " + req.GetClientName())
 
-	return &pb.ServerBroadcast{
+	// Create the event notification
+	notification := &pb.ServerMessage{
 		LamportTime: lamport,
-		Message:     req.GetMessage(),
-		ClientName:  req.GetClientName(),
-	}, nil
+		ClientName: strconv.Itoa(CLINR),
+		Message: req.Message,
+	}
 
-	//code to broadcast to every client
+	// Broadcast the event to all subscribed clients 
+	for clientId, observer := range s.clients {
+		err := observer.Send(notification)
+		if err != nil {
+			log.Printf("Error sending event to client %s: %v", clientId, err)
+			delete(s.clients, clientId) // Remove disconnected client
+		}
+	}
+	return nil
 }
 
 func main() {
 	// Initialize the server
-	s := &server{clients: make(map[string]*Client)}
+	s := &server{clients: make(map[string]pb.ITUDatabase_JoinServer)}
 
 	// Create a listener on TCP port 5050
 	lis, err := net.Listen("tcp", ":5050")

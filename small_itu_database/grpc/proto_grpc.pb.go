@@ -28,9 +28,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ITUDatabaseClient interface {
-	Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
-	Broadcast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*ServerBroadcast, error)
-	ClientLeaving(ctx context.Context, in *ClientLeaves, opts ...grpc.CallOption) (*ServerClientLeaves, error)
+	Join(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error)
+	Broadcast(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error)
+	ClientLeaving(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error)
 }
 
 type iTUDatabaseClient struct {
@@ -41,43 +41,70 @@ func NewITUDatabaseClient(cc grpc.ClientConnInterface) ITUDatabaseClient {
 	return &iTUDatabaseClient{cc}
 }
 
-func (c *iTUDatabaseClient) Join(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error) {
+func (c *iTUDatabaseClient) Join(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JoinResponse)
-	err := c.cc.Invoke(ctx, ITUDatabase_Join_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &ITUDatabase_ServiceDesc.Streams[0], ITUDatabase_Join_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[ClientMessage, ServerMessage]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
 
-func (c *iTUDatabaseClient) Broadcast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*ServerBroadcast, error) {
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_JoinClient = grpc.ServerStreamingClient[ServerMessage]
+
+func (c *iTUDatabaseClient) Broadcast(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ServerBroadcast)
-	err := c.cc.Invoke(ctx, ITUDatabase_Broadcast_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &ITUDatabase_ServiceDesc.Streams[1], ITUDatabase_Broadcast_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[ClientMessage, ServerMessage]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
 
-func (c *iTUDatabaseClient) ClientLeaving(ctx context.Context, in *ClientLeaves, opts ...grpc.CallOption) (*ServerClientLeaves, error) {
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_BroadcastClient = grpc.ServerStreamingClient[ServerMessage]
+
+func (c *iTUDatabaseClient) ClientLeaving(ctx context.Context, in *ClientMessage, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerMessage], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ServerClientLeaves)
-	err := c.cc.Invoke(ctx, ITUDatabase_ClientLeaving_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &ITUDatabase_ServiceDesc.Streams[2], ITUDatabase_ClientLeaving_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[ClientMessage, ServerMessage]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_ClientLeavingClient = grpc.ServerStreamingClient[ServerMessage]
 
 // ITUDatabaseServer is the server API for ITUDatabase service.
 // All implementations must embed UnimplementedITUDatabaseServer
 // for forward compatibility.
 type ITUDatabaseServer interface {
-	Join(context.Context, *JoinRequest) (*JoinResponse, error)
-	Broadcast(context.Context, *BroadcastRequest) (*ServerBroadcast, error)
-	ClientLeaving(context.Context, *ClientLeaves) (*ServerClientLeaves, error)
+	Join(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error
+	Broadcast(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error
+	ClientLeaving(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error
 	mustEmbedUnimplementedITUDatabaseServer()
 }
 
@@ -88,14 +115,14 @@ type ITUDatabaseServer interface {
 // pointer dereference when methods are called.
 type UnimplementedITUDatabaseServer struct{}
 
-func (UnimplementedITUDatabaseServer) Join(context.Context, *JoinRequest) (*JoinResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
+func (UnimplementedITUDatabaseServer) Join(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
-func (UnimplementedITUDatabaseServer) Broadcast(context.Context, *BroadcastRequest) (*ServerBroadcast, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
+func (UnimplementedITUDatabaseServer) Broadcast(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
-func (UnimplementedITUDatabaseServer) ClientLeaving(context.Context, *ClientLeaves) (*ServerClientLeaves, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ClientLeaving not implemented")
+func (UnimplementedITUDatabaseServer) ClientLeaving(*ClientMessage, grpc.ServerStreamingServer[ServerMessage]) error {
+	return status.Errorf(codes.Unimplemented, "method ClientLeaving not implemented")
 }
 func (UnimplementedITUDatabaseServer) mustEmbedUnimplementedITUDatabaseServer() {}
 func (UnimplementedITUDatabaseServer) testEmbeddedByValue()                     {}
@@ -118,59 +145,38 @@ func RegisterITUDatabaseServer(s grpc.ServiceRegistrar, srv ITUDatabaseServer) {
 	s.RegisterService(&ITUDatabase_ServiceDesc, srv)
 }
 
-func _ITUDatabase_Join_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(JoinRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _ITUDatabase_Join_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ClientMessage)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(ITUDatabaseServer).Join(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ITUDatabase_Join_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ITUDatabaseServer).Join(ctx, req.(*JoinRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(ITUDatabaseServer).Join(m, &grpc.GenericServerStream[ClientMessage, ServerMessage]{ServerStream: stream})
 }
 
-func _ITUDatabase_Broadcast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BroadcastRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_JoinServer = grpc.ServerStreamingServer[ServerMessage]
+
+func _ITUDatabase_Broadcast_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ClientMessage)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(ITUDatabaseServer).Broadcast(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ITUDatabase_Broadcast_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ITUDatabaseServer).Broadcast(ctx, req.(*BroadcastRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(ITUDatabaseServer).Broadcast(m, &grpc.GenericServerStream[ClientMessage, ServerMessage]{ServerStream: stream})
 }
 
-func _ITUDatabase_ClientLeaving_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClientLeaves)
-	if err := dec(in); err != nil {
-		return nil, err
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_BroadcastServer = grpc.ServerStreamingServer[ServerMessage]
+
+func _ITUDatabase_ClientLeaving_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ClientMessage)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(ITUDatabaseServer).ClientLeaving(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ITUDatabase_ClientLeaving_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ITUDatabaseServer).ClientLeaving(ctx, req.(*ClientLeaves))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(ITUDatabaseServer).ClientLeaving(m, &grpc.GenericServerStream[ClientMessage, ServerMessage]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ITUDatabase_ClientLeavingServer = grpc.ServerStreamingServer[ServerMessage]
 
 // ITUDatabase_ServiceDesc is the grpc.ServiceDesc for ITUDatabase service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -178,20 +184,23 @@ func _ITUDatabase_ClientLeaving_Handler(srv interface{}, ctx context.Context, de
 var ITUDatabase_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "ITUDatabase",
 	HandlerType: (*ITUDatabaseServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Join",
-			Handler:    _ITUDatabase_Join_Handler,
+			StreamName:    "Join",
+			Handler:       _ITUDatabase_Join_Handler,
+			ServerStreams: true,
 		},
 		{
-			MethodName: "Broadcast",
-			Handler:    _ITUDatabase_Broadcast_Handler,
+			StreamName:    "Broadcast",
+			Handler:       _ITUDatabase_Broadcast_Handler,
+			ServerStreams: true,
 		},
 		{
-			MethodName: "ClientLeaving",
-			Handler:    _ITUDatabase_ClientLeaving_Handler,
+			StreamName:    "ClientLeaving",
+			Handler:       _ITUDatabase_ClientLeaving_Handler,
+			ServerStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "grpc/proto.proto",
 }

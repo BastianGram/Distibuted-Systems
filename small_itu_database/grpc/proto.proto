@@ -1,44 +1,22 @@
 syntax = "proto3";
 option go_package = "grpc/proto";
 
-message JoinRequest {
-    int32 lamport_time = 1;
-}
-
-message JoinResponse {
-    int32 lamport_time = 1;
-    string name = 2;
-    string approved = 3;
-  
-}
-
-message BroadcastRequest {
-    int32 lamport_time = 1;
-    string message = 2;
-    string clientName = 3;
-}
-
-message ServerBroadcast {
-    int32 lamport_time = 1;
-    string message = 2;
-    string clientName = 3;
-}
-
-
-message ClientLeaves {
+message ClientMessage {
     int32 lamport_time = 1;
     string clientName = 2;
+    string message = 3;
 }
 
-message ServerClientLeaves {
+message ServerMessage {
     int32 lamport_time = 1;
     string clientName = 2;
+    string message = 3;
 }
 
 service ITUDatabase {
-    rpc Join(JoinRequest) returns(JoinResponse) {};
+    rpc Join(ClientMessage) returns(stream ServerMessage) {};
 
-    rpc Broadcast(BroadcastRequest) returns(ServerBroadcast) {};
+    rpc Broadcast(ClientMessage) returns(stream ServerMessage) {};
 
-    rpc ClientLeaving(ClientLeaves) returns(ServerClientLeaves) {};
+    rpc ClientLeaving(ClientMessage) returns(stream ServerMessage) {};
 }
