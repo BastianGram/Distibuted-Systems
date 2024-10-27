@@ -5,12 +5,13 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/handin3v2/small_itu_database/grpc"
 	"google.golang.org/grpc"
 )
 
-var lamport int32 = 0
+var lamport int32 = 1
 
 type Client struct {
 	Name string
@@ -43,21 +44,22 @@ func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServ
 		lamport++
 	}
 
+	lamport++
 	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Client nr. " + strconv.Itoa(CLINR) + " joined")
 
-	lamport++
 	// Create the event notification
 	notification := &pb.ServerMessage{
 		LamportTime: lamport,
 		ClientName: ThisClientID,
 		Message: "Welcome " + strconv.Itoa(CLINR),
 	}
+	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	// Adding a goroutine around the code to allow the client to join the notification stream
 	go func() {
-		s.mu.Lock()
-        defer s.mu.Unlock()
+		// giving the client time to join the stream
+		time.Sleep(300 * time.Millisecond)
 		for clientId, observer := range s.clients {
 			err := observer.Send(notification)
 			if err != nil {
@@ -91,13 +93,13 @@ func (s *server) ClientLeaving(req *pb.ClientMessage, stream pb.ITUDatabase_Broa
 	// Log the received message from the client
 	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " client nr." + req.GetClientName() + " has left the session" )
 
-	lamport++
 	// Create the event notification
 	notification := &pb.ServerMessage{
 		LamportTime: lamport,
 		ClientName: req.ClientName,
 		Message: "Client leaving, ID: " + req.ClientName,
 	}
+	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	for clientId, observer := range s.clients {
@@ -107,6 +109,9 @@ func (s *server) ClientLeaving(req *pb.ClientMessage, stream pb.ITUDatabase_Broa
 			delete(s.clients, clientId) // Remove disconnected client
 		}
 	}
+
+	// Remove the client from the map
+	delete(s.clients, req.ClientName)
 
     return nil
 
@@ -123,16 +128,17 @@ func (s *server) Broadcast(req *pb.ClientMessage, stream pb.ITUDatabase_Broadcas
 		lamport++
 	}
 
+	lamport++
 	// Log the received message from the client
 	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Message: "  + req.Message + " recieved from client nr. " + req.GetClientName())
 
-	lamport++
 	// Create the event notification
 	notification := &pb.ServerMessage{
 		LamportTime: lamport,
 		ClientName: strconv.Itoa(CLINR),
 		Message: req.Message,
 	}
+	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	for clientId, observer := range s.clients {

@@ -15,16 +15,19 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var lamport int32 = 0
+var lamport int32 = 1
 var name string = ""
 
 func Join(client pb.ITUDatabaseClient) {
-	req := &pb.ClientMessage{LamportTime: lamport}
+	req := &pb.ClientMessage{LamportTime: lamport + 1}
 	stream, err := client.Join(context.Background(), req)
+	log.Println("requesting server to join with lamport 2")
 	if err != nil {
 		log.Fatalf("Error subscribing to events: %v", err)
 	}
 	
+	//Increased from message sent
+	lamport = lamport +2
 
 
 	// Receive event notifications from the server
@@ -63,7 +66,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	time.Sleep(200 * time.Millisecond)
 	// Listen for user input
 	fmt.Println("Type 'send <message>' to send a message, or 'disconnect' to disconnect from the server:")
 	
@@ -79,10 +81,12 @@ func main() {
 		if input == "disconnect" {
 			ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			_, err := client.ClientLeaving(ctx, &pb.ClientMessage{LamportTime: lamport, ClientName: name, Message: "Client disconnected"})
+			_, err := client.ClientLeaving(ctx, &pb.ClientMessage{LamportTime: lamport +1, ClientName: name, Message: "Client disconnected"})
 			if err != nil {
 				log.Fatalf("could not disconnect: %v", err)
 			}
+
+			//allow time for leave message broadcast
 			time.Sleep(500 * time.Millisecond)
 			return
 		} else if len(input) > 4 && input[:4] == "send" {
@@ -93,7 +97,9 @@ func main() {
 				fmt.Println("Error: Message too long. Cannot exceed 128 characters.")
 				continue
 			}
-
+			
+			lamport++
+			log.Println("Requesting server broadcast with lamport: " + strconv.Itoa(int(lamport)))
 			ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			_, err := client.Broadcast(ctx, &pb.ClientMessage{
@@ -101,6 +107,8 @@ func main() {
 				Message: message,
 				ClientName: name,
 			})
+			//increased form message sent
+			lamport++
 			if err != nil {
 				log.Fatalf("could not send message: %v", err)
 			}
