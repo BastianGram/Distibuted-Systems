@@ -44,16 +44,17 @@ func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServ
 		lamport++
 	}
 
+	log.Println("Client request received. Lamport: " + strconv.Itoa(int(lamport)) + "  from Client nr. " + strconv.Itoa(CLINR))
+
 	lamport++
-	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Client nr. " + strconv.Itoa(CLINR) + " joined")
+	log.Println("Client has joined. broadcasting with lamport: " + strconv.Itoa(int(lamport)))
 
 	// Create the event notification
 	notification := &pb.ServerMessage{
 		LamportTime: lamport,
 		ClientName: ThisClientID,
-		Message: "Welcome " + strconv.Itoa(CLINR),
+		Message: "Welcome new client! ",
 	}
-	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	// Adding a goroutine around the code to allow the client to join the notification stream
@@ -90,8 +91,12 @@ func (s *server) ClientLeaving(req *pb.ClientMessage, stream pb.ITUDatabase_Broa
 	} else {
 		lamport++
 	}
+
+	log.Println("Client request received. Lamport: " + strconv.Itoa(int(lamport)) + "  from Client nr. " + strconv.Itoa(CLINR))
+
+	lamport++
 	// Log the received message from the client
-	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " client nr." + req.GetClientName() + " has left the session" )
+	log.Println("Client nr: " + req.ClientName + " is disconnecting. Disconnecting client and broadcasting with lamport: " + strconv.Itoa(int(lamport)))
 
 	// Create the event notification
 	notification := &pb.ServerMessage{
@@ -99,7 +104,6 @@ func (s *server) ClientLeaving(req *pb.ClientMessage, stream pb.ITUDatabase_Broa
 		ClientName: req.ClientName,
 		Message: "Client leaving, ID: " + req.ClientName,
 	}
-	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	for clientId, observer := range s.clients {
@@ -128,9 +132,11 @@ func (s *server) Broadcast(req *pb.ClientMessage, stream pb.ITUDatabase_Broadcas
 		lamport++
 	}
 
+	log.Println("Client request received. Lamport: " + strconv.Itoa(int(lamport)) + "  from Client nr. " + strconv.Itoa(CLINR))
+
 	lamport++
 	// Log the received message from the client
-	log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Message: "  + req.Message + " recieved from client nr. " + req.GetClientName())
+	log.Println("Client nr: " + req.ClientName + " has send message: " + req.Message + ". Broadcasting with lamport: " + strconv.Itoa(int(lamport)))
 
 	// Create the event notification
 	notification := &pb.ServerMessage{
@@ -138,7 +144,6 @@ func (s *server) Broadcast(req *pb.ClientMessage, stream pb.ITUDatabase_Broadcas
 		ClientName: strconv.Itoa(CLINR),
 		Message: req.Message,
 	}
-	lamport++
 
 	// Broadcast the event to all subscribed clients 
 	for clientId, observer := range s.clients {

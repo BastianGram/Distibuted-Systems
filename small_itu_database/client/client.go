@@ -21,13 +21,13 @@ var name string = ""
 func Join(client pb.ITUDatabaseClient) {
 	req := &pb.ClientMessage{LamportTime: lamport + 1}
 	stream, err := client.Join(context.Background(), req)
-	log.Println("requesting server to join with lamport 2")
+	log.Println("requesting server to join with lamport 2 (incremented from 1)")
 	if err != nil {
 		log.Fatalf("Error subscribing to events: %v", err)
 	}
 	
 	//Increased from message sent
-	lamport = lamport +2
+	lamport++
 
 
 	// Receive event notifications from the server
@@ -45,7 +45,7 @@ func Join(client pb.ITUDatabaseClient) {
 		} else {
 			lamport++
 		}
-		log.Printf("Lamport: " + strconv.Itoa(int(lamport)) + " Server: " + event.Message)
+		log.Println("Server: Lamport: " + strconv.Itoa(int(lamport)) + ". Message: " + event.Message + ". from: " + event.GetClientName())
 	}
 
 }
@@ -79,9 +79,11 @@ func main() {
 		input = scanner.Text()
 		// If user types "disconnect", call the disconnect method
 		if input == "disconnect" {
+			lamport++
+			log.Println("Leaving server. Requesting with lamport: " + strconv.Itoa(int(lamport)))
 			ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			_, err := client.ClientLeaving(ctx, &pb.ClientMessage{LamportTime: lamport +1, ClientName: name, Message: "Client disconnected"})
+			_, err := client.ClientLeaving(ctx, &pb.ClientMessage{LamportTime: lamport, ClientName: name, Message: "Client disconnected"})
 			if err != nil {
 				log.Fatalf("could not disconnect: %v", err)
 			}
@@ -107,8 +109,6 @@ func main() {
 				Message: message,
 				ClientName: name,
 			})
-			//increased form message sent
-			lamport++
 			if err != nil {
 				log.Fatalf("could not send message: %v", err)
 			}
