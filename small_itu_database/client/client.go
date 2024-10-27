@@ -60,7 +60,6 @@ func main() {
 	// Join the server
 	go Join(client)
 	
-	log.Println("test1")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -84,6 +83,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("could not disconnect: %v", err)
 			}
+			time.Sleep(500 * time.Millisecond)
 			return
 		} else if len(input) > 4 && input[:4] == "send" {
 			// Extract the message from input
