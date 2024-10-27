@@ -1,3 +1,6 @@
+All of handin 3 is in the "small_itu_database".
+The rest of the files and folders are to be ignored for the sake of handin 3.
+
 To run the program:
 You first need to run a server, then you need to join with a client.
 
