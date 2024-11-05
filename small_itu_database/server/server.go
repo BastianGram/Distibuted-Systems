@@ -32,10 +32,11 @@ var CLINR int = 100
 // Join method implementation
 func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServer) (error) {
 	//CLINR is the clientID
-	s.mu.Lock()
 	CLINR++
+	s.mu.Lock()
 	var ThisClientID string = strconv.Itoa(CLINR)
 	s.clients[ThisClientID] = stream
+    s.mu.Unlock()
 
 	if (req.LamportTime > lamport) {
 		lamport = req.LamportTime + 1
@@ -57,7 +58,7 @@ func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServ
 
 	// Broadcast the event to all subscribed clients 
 	// Adding a goroutine around the code to allow the client to join the notification stream
-	go func(notification *pb.ServerMessage) {
+	go func() {
 		// giving the client time to join the stream
 		time.Sleep(300 * time.Millisecond)
 		for clientId, observer := range s.clients {
@@ -67,8 +68,7 @@ func (s *server) Join(req *pb.ClientMessage, stream pb.ITUDatabase_BroadcastServ
 				delete(s.clients, clientId) // Remove disconnected client
 			}
 		}
-	}(notification)
-	s.mu.Unlock()
+	}()
 
 	<-stream.Context().Done()
 
