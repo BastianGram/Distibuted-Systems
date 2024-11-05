@@ -34,9 +34,9 @@ message SendsAllegiance {
 }
 
 service ITUDatabase {
-    rpc Election(stream RequestElection) returns(Answer) {};
+    rpc Election(RequestElection) returns(Answer) {};
 
     rpc Broadcast(RequestCS) returns(RequestCS) {};
 
-    rpc Coordinator(stream IAmCoordinator) returns(SendsAllegiance) {};
+    rpc Coordinator(IAmCoordinator) returns(SendsAllegiance) {};
 }
