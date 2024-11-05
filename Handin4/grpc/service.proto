@@ -1,0 +1,42 @@
+syntax = "proto3";
+option go_package = "grpc/service";
+
+message RequestElection {
+    int32 lamport_time = 1;
+    int32 clientName = 2;
+}
+
+message Answer {
+    int32 lamport_time = 1;
+    int32 MAX = 2;
+}
+
+message RequestCS {
+    int32 lamport_time = 1;
+    int32 clientName = 2;
+    string message = 3;
+}
+
+message ResponseCS {
+    int32 lamport_time = 1;
+    int32 clientName = 2;
+    string message = 3;
+}
+
+message IAmCoordinator {
+    int32 lamport_time = 1;
+    int32 clientName = 2;
+}
+
+message SendsAllegiance {
+    int32 lamport_time = 1;
+    int32 clientName = 2;
+}
+
+service ITUDatabase {
+    rpc Election(stream RequestElection) returns(Answer) {};
+
+    rpc Broadcast(RequestCS) returns(RequestCS) {};
+
+    rpc Coordinator(stream IAmCoordinator) returns(SendsAllegiance) {};
+}
