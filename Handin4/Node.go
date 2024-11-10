@@ -27,7 +27,7 @@ var Max int32 = -1
 var MaxClient *pb.Answer
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Hour)
 	defer cancel()
 
 	Node := findAvailablePort(5050)
@@ -120,9 +120,11 @@ func (N1 *TypeNode) Election(ctx context.Context, re1 *pb.RequestElection) (*pb.
 		if !isPortAvailable(int(re1.ClientName + 1)) {
 			fmt.Println("1")
 			if (Max != Node) {
+				N1.mu.Unlock()
+				defer N1.mu.Lock() // Lock again after Coordinator call if needed
 				N1.Coordinator(ctx, &pb.IAmCoordinator{LamportTime: 0, ClientName: 5051})
 			}
-
+			fmt.Println("2")
 			return &pb.Answer{LamportTime: 0, MAX: re1.ClientName}, nil
 		} else {
 			fmt.Println("Skipped a faulty node")
@@ -160,11 +162,14 @@ func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*p
 	N1.mu.Lock()
 	defer N1.mu.Unlock()
 
+	fmt.Println("3")
+
 	if !isPortAvailable(int(re1.ClientName)) {
 		if !isPortAvailable(int(re1.ClientName + 1)) {
 			fmt.Println("fail1")
 			
-		} else if((re1.ClientName + 1) == Node) {
+		} else if((re1.ClientName) == Node) {
+			fmt.Println("fail2")
 			return &pb.SendsAllegiance{LamportTime: 0, ClientName: re1.ClientName}, nil
 
 		} else {
@@ -191,9 +196,10 @@ func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*p
 			return receivingClient.Coordinator(ctx, req)
 		}
 	} else if re1.ClientName == Node {
+		fmt.Println("fail3")
 		return &pb.SendsAllegiance{LamportTime: 0, ClientName: Node - 1}, nil
 	} else {
-
+		fmt.Println("fail4")
 		conn, err := grpc.Dial(strconv.Itoa(int(Node+1)), grpc.WithInsecure())
 		if err != nil {
 			log.Fatalf("Failed to connect")
