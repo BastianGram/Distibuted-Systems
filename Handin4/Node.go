@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"errors"
 
 	pb "github.com/BastianGram/Distibuted-Systems/Handin4/Handin4/grpc"
 	"google.golang.org/grpc"
@@ -17,25 +18,57 @@ import (
 // Server struct to implement the MyServiceServer interface
 type TypeNode struct {
 	pb.UnimplementedITUDatabaseServer
+	Node int32 // equal to it's port
+	Max int32
+	conn *grpc.ClientConn // gRPC connection for client functionality
+	CriticalSection bool
+	clients map[int32]pb.ITUDatabaseClient
 
 	//clients map[string]*Client
 	mu sync.Mutex // to protect access to clients map
 }
 
-var Node int32 // equal to it's port
-var Max int32 = -1
-var MaxClient *pb.Answer
+func NewTypeNode(port int) *TypeNode {
+	node := &TypeNode{
+		Node: int32(port),
+		Max:  -1,
+		clients: make(map[int32]pb.ITUDatabaseClient),
+	}
+	// Initialize connection to all expected nodes
+	for otherPort := 5051; otherPort <= 5060; otherPort++ {
+		
+		if int32(otherPort) == node.Node {
+			continue
+		}
+		// Check if the port is available before connecting
+		if !isPortAvailable(otherPort) {
+			continue
+		}
+		address := fmt.Sprintf("localhost:%d", otherPort)
+		conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Failed to connect to node %d: %v", otherPort, err)
+			continue
+		}
+
+		node.clients[int32(otherPort)] = pb.NewITUDatabaseClient(conn)
+	}
+	return node
+}
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	Node := findAvailablePort(5050)
-	fmt.Printf("Found available port: %d\n", Node)
-	go startGRPCServer(Node)
+	port := findAvailablePort(5051)
+	node := NewTypeNode(port)
+	node.NotifyExistingNodes()
+
+	// Start the gRPC server in a goroutine
+	go startGRPCServer(port, node)
 
 	// Dial the server
-	conn, err := grpc.DialContext(ctx, "localhost:"+strconv.Itoa(int(Node)),
+	conn, err := grpc.DialContext(ctx, "localhost:"+strconv.Itoa(int(node.Node)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
@@ -43,19 +76,20 @@ func main() {
 		return
 	}
 
-	req := &pb.RequestElection{
-		LamportTime: 0,
-		ClientName:  int32(Node + 1),
-	}
+	// Assign the connection to the TypeNode instance
+	node.conn = conn
 
 	client := pb.NewITUDatabaseClient(conn)
 
-	fmt.Println("Electing... ")
+	req := &pb.RequestElection{
+		ClientName:  int32(node.Node),
+	}
+
+
+	fmt.Println("Successfully joined. Electing... ")
 
 	// Call the Election method and handle errors
-	MaxClient, err = client.Election(ctx, req)
-
-	fmt.Println("Electing...1 ")
+	MaxClient, err := client.Election(ctx, req)
 	
 	if err != nil {
 		log.Fatalf("Election call failed: %v", err)
@@ -63,7 +97,7 @@ func main() {
 	}
 
 	if MaxClient != nil {
-		Max = MaxClient.MAX
+		node.Max = MaxClient.MAX
 	} else {
 		log.Fatalf("MaxClient response is nil")
 		return
@@ -72,7 +106,7 @@ func main() {
 	select{}
 }
 
-func startGRPCServer(port int) {
+func startGRPCServer(port int, node *TypeNode) {
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		fmt.Printf("Failed to listen on port %d: %v\n", port, err)
@@ -80,7 +114,7 @@ func startGRPCServer(port int) {
 	}
 	grpcServer := grpc.NewServer()
 
-	pb.RegisterITUDatabaseServer(grpcServer, &TypeNode{})
+	pb.RegisterITUDatabaseServer(grpcServer, node)
 
 	fmt.Printf("Starting gRPC server on port %d\n", port)
 	if err := grpcServer.Serve(lis); err != nil {
@@ -112,110 +146,147 @@ func isPortAvailable(port int) bool {
     return true // Connection successful, meaning something is listening
 }
 
+func checkMap(clients map[int32]pb.ITUDatabaseClient) {
+	for port := range clients {
+		address := fmt.Sprintf("localhost:%d", port)
+		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+		if err != nil {
+			log.Printf("Client %d has crashed, removing it from list...", port)
+			delete(clients, port)
+		}
+		conn.Close() // Close the connection if it was successful
+
+	}
+}
+
 func (N1 *TypeNode) Election(ctx context.Context, re1 *pb.RequestElection) (*pb.Answer, error) {
 	N1.mu.Lock()
 	defer N1.mu.Unlock()
 
-	if !isPortAvailable(int(re1.ClientName)) {
-		if !isPortAvailable(int(re1.ClientName + 1)) {
-			fmt.Println("1")
-			if (Max != Node) {
-				N1.mu.Unlock()
-				defer N1.mu.Lock() // Lock again after Coordinator call if needed
-				N1.Coordinator(ctx, &pb.IAmCoordinator{LamportTime: 0, ClientName: 5051})
-			}
-			fmt.Println("2")
-			return &pb.Answer{LamportTime: 0, MAX: re1.ClientName}, nil
-		} else {
-			fmt.Println("Skipped a faulty node")
-			conn, _ := grpc.Dial(strconv.Itoa(int(re1.ClientName+1)), grpc.WithInsecure())
-			
-			receivingClient := pb.NewITUDatabaseClient(conn)
-			req := &pb.RequestElection{
-				LamportTime: 0,
-				ClientName:  int32(Node + 1),
-			}
+	checkMap(N1.clients)
 
-			return receivingClient.Election(ctx, req)
+	if (len(N1.clients) == 0) {
+		return &pb.Answer{MAX: N1.Node}, nil
+	}
 
+	if client1, exists := N1.clients[re1.ClientName+1]; exists {
+		req := &pb.RequestElection{
+			ClientName:  int32(N1.Node + 1),
 		}
-
-	} else if re1.ClientName == Node {
-		if (Max != Node) {
-			N1.Coordinator(ctx, &pb.IAmCoordinator{LamportTime: 0, ClientName: 5051})
+		return client1.Election(ctx, req)
+	} else if client2, exists := N1.clients[re1.ClientName+2]; exists {
+		req := &pb.RequestElection{
+			ClientName:  int32(N1.Node + 1),
 		}
-		return &pb.Answer{LamportTime: 0, MAX: re1.ClientName}, nil
+		return client2.Election(ctx, req)
+	} else if client3, exists := N1.clients[5051]; exists{
+		req := &pb.IAmCoordinator{
+			ClientName:  5051,
+			Sender: N1.Node,
+		}
+		client3.Coordinator(ctx, req)
+		return &pb.Answer{MAX: N1.Node}, nil
+	} else if clinet4, exists := N1.clients[5052]; exists{
+		req := &pb.IAmCoordinator{
+			ClientName:  5052,
+			Sender: N1.Node,
+		}
+		clinet4.Coordinator(ctx, req)
+		return &pb.Answer{MAX: N1.Node}, nil
 	} else {
-		conn, _ := grpc.Dial(strconv.Itoa(int(Node+1)), grpc.WithInsecure())
-		
-		receivingClient := pb.NewITUDatabaseClient(conn)
-		req := &pb.RequestElection {
-			LamportTime: 0,
-			ClientName:  int32(Node + 1),
-		}
 
-		return receivingClient.Election(ctx, req)
+		return &pb.Answer{MAX: N1.Node}, errors.New("very bad fail, " + strconv.Itoa(int(re1.ClientName)))
 	}
 }
 
 func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*pb.SendsAllegiance, error) {
+	//N1.mu.Lock()
+
+	checkMap(N1.clients)
+
+	if re1.Sender == N1.Node {
+		return &pb.SendsAllegiance{ClientName: N1.Node}, nil
+	}
+
+ 	// Determine the next client to contact in the chain, if available
+ 	var nextClient pb.ITUDatabaseClient
+ 	var nextClientName int32
+	
+
+	if client1, exists := N1.clients[re1.ClientName+1]; exists {
+		nextClient = client1
+        nextClientName = re1.ClientName + 1
+	} else if client2, exists := N1.clients[re1.ClientName+2]; exists {
+		nextClient = client2
+        nextClientName = re1.ClientName + 2
+	} else {
+		N1.mu.Unlock()
+		return &pb.SendsAllegiance{ClientName: N1.Node}, errors.New("next node in coordinator chain not available")
+	}
+
+	// Unlock before making the recursive gRPC call
+    // N1.mu.Unlock()
+
+    // Create the request for the next client in the chain
+    req := &pb.IAmCoordinator{
+        ClientName: nextClientName,
+        Sender:     re1.Sender,
+    }
+
+    // Make the recursive call without holding the lock to avoid deadlock
+    response, err := nextClient.Coordinator(ctx, req)
+    if err != nil {
+        fmt.Printf("Coordinator chain failed at node %d: %v\n", nextClientName, err)
+        return &pb.SendsAllegiance{ClientName: N1.Node}, err
+    }
+
+    return response, nil
+}
+
+func (node *TypeNode) NotifyExistingNodes() {
+	for port := 5051; port <= 5060; port++ {
+
+		if int32(port) == node.Node {
+			continue
+		}
+
+		// Try to connect to existing node
+		if client, exists := node.clients[int32(port)]; exists {
+			req := &pb.JoinRequest{Port: int32(node.Node)}
+			_, err := client.NotifyJoin(context.Background(), req)
+			if err != nil {
+				log.Printf("Failed to notify node %d: %v", port, err)
+			}
+		}
+	}
+}
+
+func (N1 *TypeNode) NotifyJoin(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponse, error) {
 	N1.mu.Lock()
 	defer N1.mu.Unlock()
 
-	fmt.Println("3")
-
-	if !isPortAvailable(int(re1.ClientName)) {
-		if !isPortAvailable(int(re1.ClientName + 1)) {
-			fmt.Println("fail1")
-			
-		} else if((re1.ClientName) == Node) {
-			fmt.Println("fail2")
-			return &pb.SendsAllegiance{LamportTime: 0, ClientName: re1.ClientName}, nil
-
-		} else {
-			fmt.Println("Skipped a faulty node")
-
-			if re1.ClientName == Node+1 {
-				return &pb.SendsAllegiance{LamportTime: 0, ClientName: Node}, nil
-			}
-
-			conn, err := grpc.Dial(strconv.Itoa(int(Node+2)), grpc.WithInsecure())
-			if err != nil {
-				log.Fatalf("Failed to connect")
-			}
-
-			receivingClient := pb.NewITUDatabaseClient(conn)
-			req := &pb.IAmCoordinator{
-				LamportTime: 0,
-				ClientName:  re1.ClientName,
-			}
-
-			//Here is the new coordinator:
-			Max = re1.ClientName
-
-			return receivingClient.Coordinator(ctx, req)
-		}
-	} else if re1.ClientName == Node {
-		fmt.Println("fail3")
-		return &pb.SendsAllegiance{LamportTime: 0, ClientName: Node - 1}, nil
-	} else {
-		fmt.Println("fail4")
-		conn, err := grpc.Dial(strconv.Itoa(int(Node+1)), grpc.WithInsecure())
-		if err != nil {
-			log.Fatalf("Failed to connect")
-		}
-
-		receivingClient := pb.NewITUDatabaseClient(conn)
-		req := &pb.IAmCoordinator{
-			LamportTime: 0,
-			ClientName:  int32(Node + 1),
-		}
-
-		return receivingClient.Coordinator(ctx, req)
+	newNodePort := req.Port
+	if newNodePort == N1.Node {
+		// Ignore self-notification
+		return &pb.JoinResponse{Success: true}, nil
 	}
 
-	//Here is the new coordinator:
-	Max = re1.ClientName
+	// Check if the node is already in the clients map
+	if _, exists := N1.clients[int32(newNodePort)]; exists {
+		return &pb.JoinResponse{Success: true}, nil
+	}
 
-	return &pb.SendsAllegiance{LamportTime: 0, ClientName: 0}, nil
+	// Attempt to connect to the new node
+	address := fmt.Sprintf("localhost:%d", newNodePort)
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("Failed to connect to new node %d: %v", newNodePort, err)
+		return &pb.JoinResponse{Success: false}, err
+	}
+
+	// Add the new client to the clients map
+	N1.clients[int32(newNodePort)] = pb.NewITUDatabaseClient(conn)
+	log.Printf("Connected to new node on port %d", newNodePort)
+
+	return &pb.JoinResponse{Success: true}, nil
 }

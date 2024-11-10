@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	ITUDatabase_NotifyJoin_FullMethodName  = "/ITUDatabase/NotifyJoin"
 	ITUDatabase_Election_FullMethodName    = "/ITUDatabase/Election"
 	ITUDatabase_Broadcast_FullMethodName   = "/ITUDatabase/Broadcast"
 	ITUDatabase_Coordinator_FullMethodName = "/ITUDatabase/Coordinator"
@@ -28,6 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ITUDatabaseClient interface {
+	NotifyJoin(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
 	Election(ctx context.Context, in *RequestElection, opts ...grpc.CallOption) (*Answer, error)
 	Broadcast(ctx context.Context, in *RequestCS, opts ...grpc.CallOption) (*RequestCS, error)
 	Coordinator(ctx context.Context, in *IAmCoordinator, opts ...grpc.CallOption) (*SendsAllegiance, error)
@@ -39,6 +41,16 @@ type iTUDatabaseClient struct {
 
 func NewITUDatabaseClient(cc grpc.ClientConnInterface) ITUDatabaseClient {
 	return &iTUDatabaseClient{cc}
+}
+
+func (c *iTUDatabaseClient) NotifyJoin(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinResponse)
+	err := c.cc.Invoke(ctx, ITUDatabase_NotifyJoin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *iTUDatabaseClient) Election(ctx context.Context, in *RequestElection, opts ...grpc.CallOption) (*Answer, error) {
@@ -75,6 +87,7 @@ func (c *iTUDatabaseClient) Coordinator(ctx context.Context, in *IAmCoordinator,
 // All implementations must embed UnimplementedITUDatabaseServer
 // for forward compatibility.
 type ITUDatabaseServer interface {
+	NotifyJoin(context.Context, *JoinRequest) (*JoinResponse, error)
 	Election(context.Context, *RequestElection) (*Answer, error)
 	Broadcast(context.Context, *RequestCS) (*RequestCS, error)
 	Coordinator(context.Context, *IAmCoordinator) (*SendsAllegiance, error)
@@ -88,6 +101,9 @@ type ITUDatabaseServer interface {
 // pointer dereference when methods are called.
 type UnimplementedITUDatabaseServer struct{}
 
+func (UnimplementedITUDatabaseServer) NotifyJoin(context.Context, *JoinRequest) (*JoinResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyJoin not implemented")
+}
 func (UnimplementedITUDatabaseServer) Election(context.Context, *RequestElection) (*Answer, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Election not implemented")
 }
@@ -116,6 +132,24 @@ func RegisterITUDatabaseServer(s grpc.ServiceRegistrar, srv ITUDatabaseServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ITUDatabase_ServiceDesc, srv)
+}
+
+func _ITUDatabase_NotifyJoin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ITUDatabaseServer).NotifyJoin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ITUDatabase_NotifyJoin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ITUDatabaseServer).NotifyJoin(ctx, req.(*JoinRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ITUDatabase_Election_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -179,6 +213,10 @@ var ITUDatabase_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "ITUDatabase",
 	HandlerType: (*ITUDatabaseServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "NotifyJoin",
+			Handler:    _ITUDatabase_NotifyJoin_Handler,
+		},
 		{
 			MethodName: "Election",
 			Handler:    _ITUDatabase_Election_Handler,
