@@ -2,30 +2,30 @@ syntax = "proto3";
 option go_package = "grpc/service";
 
 message RequestElection {
-    int32 clientName = 2;
+    int32 clientName = 1;
 }
 
 message Answer {
-    int32 MAX = 2;
+    int32 MAX = 1;
 }
 
 message RequestCS {
-    int32 clientName = 2;
-    string message = 3;
+    int32 clientName = 1;
+    string message = 2;
 }
 
 message ResponseCS {
-    int32 clientName = 2;
-    string message = 3;
+    int32 clientName = 1;
+    string message = 2;
 }
 
 message IAmCoordinator {
-    int32 clientName = 2;
-    int32 sender = 3;
+    int32 clientName = 1;
+    int32 sender = 2;
 }
 
 message SendsAllegiance {
-    int32 clientName = 2;
+    int32 clientName = 1;
 }
 
 message JoinRequest {
@@ -41,7 +41,7 @@ service ITUDatabase {
 
     rpc Election(RequestElection) returns(Answer) {};
 
-    rpc Broadcast(RequestCS) returns(RequestCS) {};
+    rpc Broadcast(RequestCS) returns(ResponseCS) {};
 
     rpc Coordinator(IAmCoordinator) returns(SendsAllegiance) {};
 }

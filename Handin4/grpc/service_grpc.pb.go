@@ -31,7 +31,7 @@ const (
 type ITUDatabaseClient interface {
 	NotifyJoin(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
 	Election(ctx context.Context, in *RequestElection, opts ...grpc.CallOption) (*Answer, error)
-	Broadcast(ctx context.Context, in *RequestCS, opts ...grpc.CallOption) (*RequestCS, error)
+	Broadcast(ctx context.Context, in *RequestCS, opts ...grpc.CallOption) (*ResponseCS, error)
 	Coordinator(ctx context.Context, in *IAmCoordinator, opts ...grpc.CallOption) (*SendsAllegiance, error)
 }
 
@@ -63,9 +63,9 @@ func (c *iTUDatabaseClient) Election(ctx context.Context, in *RequestElection, o
 	return out, nil
 }
 
-func (c *iTUDatabaseClient) Broadcast(ctx context.Context, in *RequestCS, opts ...grpc.CallOption) (*RequestCS, error) {
+func (c *iTUDatabaseClient) Broadcast(ctx context.Context, in *RequestCS, opts ...grpc.CallOption) (*ResponseCS, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RequestCS)
+	out := new(ResponseCS)
 	err := c.cc.Invoke(ctx, ITUDatabase_Broadcast_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (c *iTUDatabaseClient) Coordinator(ctx context.Context, in *IAmCoordinator,
 type ITUDatabaseServer interface {
 	NotifyJoin(context.Context, *JoinRequest) (*JoinResponse, error)
 	Election(context.Context, *RequestElection) (*Answer, error)
-	Broadcast(context.Context, *RequestCS) (*RequestCS, error)
+	Broadcast(context.Context, *RequestCS) (*ResponseCS, error)
 	Coordinator(context.Context, *IAmCoordinator) (*SendsAllegiance, error)
 	mustEmbedUnimplementedITUDatabaseServer()
 }
@@ -107,7 +107,7 @@ func (UnimplementedITUDatabaseServer) NotifyJoin(context.Context, *JoinRequest) 
 func (UnimplementedITUDatabaseServer) Election(context.Context, *RequestElection) (*Answer, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Election not implemented")
 }
-func (UnimplementedITUDatabaseServer) Broadcast(context.Context, *RequestCS) (*RequestCS, error) {
+func (UnimplementedITUDatabaseServer) Broadcast(context.Context, *RequestCS) (*ResponseCS, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 func (UnimplementedITUDatabaseServer) Coordinator(context.Context, *IAmCoordinator) (*SendsAllegiance, error) {

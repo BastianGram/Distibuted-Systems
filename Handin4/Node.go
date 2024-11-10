@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 	"errors"
+	"bufio"
+	"os"
 
 	pb "github.com/BastianGram/Distibuted-Systems/Handin4/Handin4/grpc"
 	"google.golang.org/grpc"
@@ -72,7 +74,7 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
-		fmt.Printf("Failed to connect: %v\n", err)
+		log.Printf("Failed to connect: %v\n", err)
 		return
 	}
 
@@ -86,7 +88,7 @@ func main() {
 	}
 
 
-	fmt.Println("Successfully joined. Electing... ")
+	log.Println("Successfully joined. Electing... ")
 
 	// Call the Election method and handle errors
 	MaxClient, err := client.Election(ctx, req)
@@ -103,22 +105,57 @@ func main() {
 		return
 	}
 
-	select{}
+	var input string
+
+	// Infinite loop to listen for user input
+	for {
+		// Read user input
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan() // use for scanner.Scan() to keep reading
+		input = scanner.Text()
+		// If user types "disconnect", call the disconnect method
+		if len(input) > 4 && input[:4] == "send" {
+			checkMap(node.clients)
+
+			if node.Node == node.Max {
+				fmt.Println("Leader is in critical section")
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			// Extract the message from input
+			message := input[5:]
+
+			ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", node.Max))
+			if err != nil {
+				fmt.Printf("Leader %d is dead. calling a new one...", node.Max)
+				node.Election(ctx, &pb.RequestElection{ClientName: node.Node})
+			} else{
+				ln.Close() // Close the listener since we only wanted to check availability
+			}
+
+			client1 := node.clients[node.Max]
+
+			client1.Broadcast(ctx, &pb.RequestCS{ClientName: node.Node, Message: message})
+		} else {
+			fmt.Println("Unknown command. Type 'send <message>' to send a message")
+		}
+	}
 }
 
 func startGRPCServer(port int, node *TypeNode) {
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
-		fmt.Printf("Failed to listen on port %d: %v\n", port, err)
+		log.Printf("Failed to listen on port %d: %v\n", port, err)
 		return
 	}
 	grpcServer := grpc.NewServer()
 
 	pb.RegisterITUDatabaseServer(grpcServer, node)
 
-	fmt.Printf("Starting gRPC server on port %d\n", port)
+	log.Printf("Starting gRPC server on port %d\n", port)
 	if err := grpcServer.Serve(lis); err != nil {
-		fmt.Printf("Failed to serve gRPC server: %v\n", err)
+		log.Printf("Failed to serve gRPC server: %v\n", err)
 	}
 }
 
@@ -185,6 +222,7 @@ func (N1 *TypeNode) Election(ctx context.Context, re1 *pb.RequestElection) (*pb.
 			Sender: N1.Node,
 		}
 		client3.Coordinator(ctx, req)
+
 		return &pb.Answer{MAX: N1.Node}, nil
 	} else if clinet4, exists := N1.clients[5052]; exists{
 		req := &pb.IAmCoordinator{
@@ -205,6 +243,8 @@ func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*p
 	checkMap(N1.clients)
 
 	if re1.Sender == N1.Node {
+		N1.Max = N1.Node
+		log.Printf("%d is the new coordinator", N1.Max)
 		return &pb.SendsAllegiance{ClientName: N1.Node}, nil
 	}
 
@@ -236,12 +276,37 @@ func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*p
     // Make the recursive call without holding the lock to avoid deadlock
     response, err := nextClient.Coordinator(ctx, req)
     if err != nil {
-        fmt.Printf("Coordinator chain failed at node %d: %v\n", nextClientName, err)
+        log.Printf("Coordinator chain failed at node %d: %v\n", nextClientName, err)
         return &pb.SendsAllegiance{ClientName: N1.Node}, err
     }
 
+	N1.Max = response.ClientName
+	log.Printf("%d is the new coordinator", N1.Max)
+
     return response, nil
 }
+
+func (N1 *TypeNode) Broadcast(ctx context.Context, re1 *pb.RequestCS) (*pb.ResponseCS, error) {
+	N1.mu.Lock()
+	defer N1.mu.Unlock()
+
+	//client, _ := N1.clients[N1.Max]
+
+	if (N1.Max != N1.Node) {
+		return &pb.ResponseCS{ClientName: N1.Node, Message: "fail"}, errors.New("the wrong leader is in charge")
+	}
+
+	N1.CriticalSection = false
+
+	fmt.Println("Client is accessing critical section")
+	time.Sleep(5 * time.Second)
+
+	N1.CriticalSection = true
+	
+	return &pb.ResponseCS{ClientName: N1.Node, Message: "Message send"}, nil
+}
+
+
 
 func (node *TypeNode) NotifyExistingNodes() {
 	for port := 5051; port <= 5060; port++ {
