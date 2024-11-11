@@ -117,18 +117,17 @@ func main() {
 		if len(input) > 4 && input[:4] == "send" {
 			checkMap(node.clients)
 
+			// Extract the message from input
+			message := input[5:]
+			
 			if node.Node == node.Max {
-				fmt.Println("Leader is in critical section")
-				time.Sleep(5 * time.Second)
+				node.Broadcast(ctx, &pb.RequestCS{ClientName: node.Node, Message: message})
 				continue
 			}
 
-			// Extract the message from input
-			message := input[5:]
-
 			ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", node.Max))
 			if err != nil {
-				fmt.Printf("Leader %d is dead. calling a new one...", node.Max)
+				log.Printf("Leader %d is dead. calling a new one...", node.Max)
 				node.Election(ctx, &pb.RequestElection{ClientName: node.Node})
 			} else{
 				ln.Close() // Close the listener since we only wanted to check availability
@@ -138,7 +137,7 @@ func main() {
 
 			client1.Broadcast(ctx, &pb.RequestCS{ClientName: node.Node, Message: message})
 		} else {
-			fmt.Println("Unknown command. Type 'send <message>' to send a message")
+			log.Println("Unknown command. Type 'send <message>' to send a message")
 		}
 	}
 }
@@ -190,16 +189,13 @@ func checkMap(clients map[int32]pb.ITUDatabaseClient) {
 		if err != nil {
 			log.Printf("Client %d has crashed, removing it from list...", port)
 			delete(clients, port)
+			continue
 		}
 		conn.Close() // Close the connection if it was successful
-
 	}
 }
 
 func (N1 *TypeNode) Election(ctx context.Context, re1 *pb.RequestElection) (*pb.Answer, error) {
-	N1.mu.Lock()
-	defer N1.mu.Unlock()
-
 	checkMap(N1.clients)
 
 	if (len(N1.clients) == 0) {
@@ -238,8 +234,6 @@ func (N1 *TypeNode) Election(ctx context.Context, re1 *pb.RequestElection) (*pb.
 }
 
 func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*pb.SendsAllegiance, error) {
-	//N1.mu.Lock()
-
 	checkMap(N1.clients)
 
 	if re1.Sender == N1.Node {
@@ -260,12 +254,8 @@ func (N1 *TypeNode) Coordinator(ctx context.Context, re1 *pb.IAmCoordinator) (*p
 		nextClient = client2
         nextClientName = re1.ClientName + 2
 	} else {
-		N1.mu.Unlock()
 		return &pb.SendsAllegiance{ClientName: N1.Node}, errors.New("next node in coordinator chain not available")
 	}
-
-	// Unlock before making the recursive gRPC call
-    // N1.mu.Unlock()
 
     // Create the request for the next client in the chain
     req := &pb.IAmCoordinator{
@@ -296,12 +286,9 @@ func (N1 *TypeNode) Broadcast(ctx context.Context, re1 *pb.RequestCS) (*pb.Respo
 		return &pb.ResponseCS{ClientName: N1.Node, Message: "fail"}, errors.New("the wrong leader is in charge")
 	}
 
-	N1.CriticalSection = false
-
-	fmt.Println("Client is accessing critical section")
+	log.Printf("Client %d, is accessing critical section \n", re1.ClientName)
 	time.Sleep(5 * time.Second)
-
-	N1.CriticalSection = true
+	log.Printf("Client %d, has left the critical section \n", re1.ClientName)
 	
 	return &pb.ResponseCS{ClientName: N1.Node, Message: "Message send"}, nil
 }
@@ -327,8 +314,6 @@ func (node *TypeNode) NotifyExistingNodes() {
 }
 
 func (N1 *TypeNode) NotifyJoin(ctx context.Context, req *pb.JoinRequest) (*pb.JoinResponse, error) {
-	N1.mu.Lock()
-	defer N1.mu.Unlock()
 
 	newNodePort := req.Port
 	if newNodePort == N1.Node {
