@@ -6,19 +6,23 @@ message JoinRequest {
 }
   
 message JoinResponse {
-    bool success = 1;
+    int32 id = 1;
+    bool success = 2;
 }
 
 message bidAmount {
-    int32 amount = 1;
+    int32 id = 1;
+    int32 amount = 2;
 }
 
 message sync {
-    bool anwer = 1;
+    bool answer = 1;
 }
 
 message ack {
-    bool anwer = 1;
+    int32 id = 1;
+    bool answer = 2;
+    int32 highestBid = 3;
 }
 
 message results {
