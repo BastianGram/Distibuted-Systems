@@ -1,0 +1,35 @@
+syntax = "proto3";
+option go_package = "grpc/service";
+
+message JoinRequest {
+    int32 port = 1;
+}
+  
+message JoinResponse {
+    bool success = 1;
+}
+
+message bidAmount {
+    int32 amount = 1;
+}
+
+message sync {
+    bool anwer = 1;
+}
+
+message ack {
+    bool anwer = 1;
+}
+
+message results {
+    bool success = 1;
+    int32 amount = 2;
+}
+
+service ITUDatabase {
+    rpc NotifyJoin (JoinRequest) returns (JoinResponse) {}
+
+    rpc bid (bidAmount) returns (stream ack) {}
+
+    rpc result (sync) returns (results) {}
+}
