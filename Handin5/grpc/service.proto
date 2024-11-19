@@ -31,8 +31,6 @@ message results {
 }
 
 service ITUDatabase {
-    rpc NotifyJoin (JoinRequest) returns (JoinResponse) {}
-
     rpc bid (bidAmount) returns (stream ack) {}
 
     rpc result (sync) returns (results) {}

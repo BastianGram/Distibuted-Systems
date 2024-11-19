@@ -116,7 +116,6 @@ func main() {
 		} else {
 			fmt.Println("Unknown command. Type 'send <message>' to send a message or 'disconnect' to disconnect from the server.")
 		}
-			
 	}
 }
 
