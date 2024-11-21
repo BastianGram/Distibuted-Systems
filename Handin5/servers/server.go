@@ -3,12 +3,12 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/Handin5/Handin5/grpc"
 	"google.golang.org/grpc"
@@ -21,13 +21,12 @@ type Client struct {
 // Server struct to implement the MyServiceServer interface
 type server struct {
 	pb.ITUDatabaseServer
-	mu           sync.Mutex // to protect access to clients map
-	currentBid   int32
+	mu              sync.Mutex // to protect access to clients map
+	currentBid      int32
 	HighestClientID int32
-	auctionState bool
-	clientNumber int32
+	auctionState    bool
+	clientNumber    int32
 }
-
 
 // Is called whenever a client bids
 func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
@@ -44,7 +43,6 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 		}, nil
 	}
 
-
 	if req.Id == -1 {
 		s.clientNumber++
 		log.Println("Client bid received from Client nr. " + strconv.Itoa(int(s.clientNumber)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
@@ -57,7 +55,7 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 		log.Printf("Bid is not large enough")
 		return &pb.Ack{
 			Id:         s.clientNumber,
-			Answer:     true,
+			Answer:     false,
 			HighestBid: s.currentBid,
 		}, nil
 		//Amount is larger than previous bid
@@ -109,9 +107,8 @@ func GoServe(grpcServer *grpc.Server, lis net.Listener) {
 }
 
 func main() {
-
 	// Initialize the server
-	s := &server{currentBid: 0,HighestClientID: -1 , auctionState: true, clientNumber: 0}
+	s := &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
 
 	// Create a listener on TCP port 5050
 	lis, err := net.Listen("tcp", ":5050")
@@ -121,30 +118,51 @@ func main() {
 
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer()
-
 	pb.RegisterITUDatabaseServer(grpcServer, s)
 
 	log.Println("Server started. Listening on port 5050.")
 	log.Println("Auction started, awaiting bids")
 
+	// Start the gRPC server in a separate goroutine
 	go GoServe(grpcServer, lis)
 
+	// Define auction duration
+	auctionDuration := 20 // Auction duration in seconds
+
+	// Start a timer for the auction
+	go func() {
+		log.Printf("Auction will automatically end in %d seconds.", auctionDuration)
+		<-time.After(time.Duration(auctionDuration) * time.Second)
+		s.mu.Lock()
+		s.auctionState = false
+		s.mu.Unlock()
+		log.Println("Auction has ended. No further bids are allowed.")
+	}()
+
 	// Listen for user input
-	log.Println("Type 'end auction' to prevent further bids")
+	log.Println("Type 'end auction' to end the auction manually.")
 
 	var input string
+	scanner := bufio.NewScanner(os.Stdin)
 
-	// Infinite loop to listen for user input
 	for {
 		// Read user input
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan() // use for scanner.Scan() to keep reading
+		scanner.Scan()
 		input = scanner.Text()
-		// If user types "disconnect", call the disconnect method
+
+		// If user types "end auction", stop the auction
 		if input == "end auction" {
+			s.mu.Lock()
 			s.auctionState = false
+			s.mu.Unlock()
+			log.Println("Auction ended manually. No further bids are allowed.")
+			break
 		} else {
-			fmt.Println("Unknown command. Type 'end auction' to prevent further bids")
+			log.Println("Unknown command. Type 'end auction' to end the auction manually.")
 		}
 	}
+
+	// Ensure the gRPC server shuts down cleanly
+	grpcServer.GracefulStop()
+	log.Println("Server shut down.")
 }

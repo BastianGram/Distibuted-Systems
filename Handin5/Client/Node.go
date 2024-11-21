@@ -57,12 +57,12 @@ func main() {
 				Amount: bidAmount, // Use the extracted bid amount
 			})
 			if !ack.Answer {
-				log.Printf("No more bids allowed, the auction is over. Highest bid was: " + strconv.Itoa(int(ack.HighestBid)))
-				break
+				log.Printf("Bid failed")
+				continue
 			}
 			if ID == -1 {
 				ID = ack.Id
-				log.Print("This client has ID: " , ID)
+				log.Print("This client has ID: ", ID)
 			}
 			if err != nil {
 				log.Printf("Failed to send bid: %d", err)
