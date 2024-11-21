@@ -19,17 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ITUDatabase_NotifyJoin_FullMethodName = "/ITUDatabase/NotifyJoin"
-	ITUDatabase_Bid_FullMethodName        = "/ITUDatabase/bid"
-	ITUDatabase_Result_FullMethodName     = "/ITUDatabase/result"
+	ITUDatabase_Bid_FullMethodName    = "/ITUDatabase/bid"
+	ITUDatabase_Result_FullMethodName = "/ITUDatabase/result"
 )
 
 // ITUDatabaseClient is the client API for ITUDatabase service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ITUDatabaseClient interface {
-	NotifyJoin(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error)
-	Bid(ctx context.Context, in *BidAmount, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Ack], error)
+	Bid(ctx context.Context, in *BidAmount, opts ...grpc.CallOption) (*Ack, error)
 	Result(ctx context.Context, in *Sync, opts ...grpc.CallOption) (*Results, error)
 }
 
@@ -41,34 +39,15 @@ func NewITUDatabaseClient(cc grpc.ClientConnInterface) ITUDatabaseClient {
 	return &iTUDatabaseClient{cc}
 }
 
-func (c *iTUDatabaseClient) NotifyJoin(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (*JoinResponse, error) {
+func (c *iTUDatabaseClient) Bid(ctx context.Context, in *BidAmount, opts ...grpc.CallOption) (*Ack, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(JoinResponse)
-	err := c.cc.Invoke(ctx, ITUDatabase_NotifyJoin_FullMethodName, in, out, cOpts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, ITUDatabase_Bid_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
-
-func (c *iTUDatabaseClient) Bid(ctx context.Context, in *BidAmount, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Ack], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &ITUDatabase_ServiceDesc.Streams[0], ITUDatabase_Bid_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[BidAmount, Ack]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ITUDatabase_BidClient = grpc.ServerStreamingClient[Ack]
 
 func (c *iTUDatabaseClient) Result(ctx context.Context, in *Sync, opts ...grpc.CallOption) (*Results, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -84,8 +63,7 @@ func (c *iTUDatabaseClient) Result(ctx context.Context, in *Sync, opts ...grpc.C
 // All implementations must embed UnimplementedITUDatabaseServer
 // for forward compatibility.
 type ITUDatabaseServer interface {
-	NotifyJoin(context.Context, *JoinRequest) (*JoinResponse, error)
-	Bid(*BidAmount, grpc.ServerStreamingServer[Ack]) error
+	Bid(context.Context, *BidAmount) (*Ack, error)
 	Result(context.Context, *Sync) (*Results, error)
 	mustEmbedUnimplementedITUDatabaseServer()
 }
@@ -97,11 +75,8 @@ type ITUDatabaseServer interface {
 // pointer dereference when methods are called.
 type UnimplementedITUDatabaseServer struct{}
 
-func (UnimplementedITUDatabaseServer) NotifyJoin(context.Context, *JoinRequest) (*JoinResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NotifyJoin not implemented")
-}
-func (UnimplementedITUDatabaseServer) Bid(*BidAmount, grpc.ServerStreamingServer[Ack]) error {
-	return status.Errorf(codes.Unimplemented, "method Bid not implemented")
+func (UnimplementedITUDatabaseServer) Bid(context.Context, *BidAmount) (*Ack, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Bid not implemented")
 }
 func (UnimplementedITUDatabaseServer) Result(context.Context, *Sync) (*Results, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Result not implemented")
@@ -127,34 +102,23 @@ func RegisterITUDatabaseServer(s grpc.ServiceRegistrar, srv ITUDatabaseServer) {
 	s.RegisterService(&ITUDatabase_ServiceDesc, srv)
 }
 
-func _ITUDatabase_NotifyJoin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(JoinRequest)
+func _ITUDatabase_Bid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BidAmount)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ITUDatabaseServer).NotifyJoin(ctx, in)
+		return srv.(ITUDatabaseServer).Bid(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ITUDatabase_NotifyJoin_FullMethodName,
+		FullMethod: ITUDatabase_Bid_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ITUDatabaseServer).NotifyJoin(ctx, req.(*JoinRequest))
+		return srv.(ITUDatabaseServer).Bid(ctx, req.(*BidAmount))
 	}
 	return interceptor(ctx, in, info, handler)
 }
-
-func _ITUDatabase_Bid_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(BidAmount)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(ITUDatabaseServer).Bid(m, &grpc.GenericServerStream[BidAmount, Ack]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ITUDatabase_BidServer = grpc.ServerStreamingServer[Ack]
 
 func _ITUDatabase_Result_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Sync)
@@ -182,20 +146,14 @@ var ITUDatabase_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ITUDatabaseServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "NotifyJoin",
-			Handler:    _ITUDatabase_NotifyJoin_Handler,
+			MethodName: "bid",
+			Handler:    _ITUDatabase_Bid_Handler,
 		},
 		{
 			MethodName: "result",
 			Handler:    _ITUDatabase_Result_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "bid",
-			Handler:       _ITUDatabase_Bid_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "grpc/service.proto",
 }

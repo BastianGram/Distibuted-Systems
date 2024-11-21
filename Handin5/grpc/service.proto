@@ -26,12 +26,13 @@ message ack {
 }
 
 message results {
-    bool success = 1;
-    int32 amount = 2;
+    int32 id = 1;
+    bool success = 2;
+    int32 amount = 3;
 }
 
 service ITUDatabase {
-    rpc bid (bidAmount) returns (stream ack) {}
+    rpc bid (bidAmount) returns (ack) {}
 
     rpc result (sync) returns (results) {}
 }

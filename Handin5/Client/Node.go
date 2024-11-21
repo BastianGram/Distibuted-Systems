@@ -23,10 +23,10 @@ func main() {
 	}
 	defer conn.Close()
 
+	var ID int32 = -1
+
 	// Create a new gRPC client
 	client := pb.NewITUDatabaseClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 
 	// Main loop to process user input
 	for {
@@ -49,17 +49,50 @@ func main() {
 
 			// Send the bid to the server
 			log.Printf("Sending bid of %d...", bidAmount)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			_, err = client.Bid(ctx, &pb.BidAmount{
-				Id:     0,         // Replace with appropriate Id if needed
+			ack, err := client.Bid(ctx, &pb.BidAmount{
+				Id:     ID,        // Replace with appropriate Id if needed
 				Amount: bidAmount, // Use the extracted bid amount
 			})
+			if !ack.Answer {
+				log.Printf("No more bids allowed, the auction is over. Highest bid was: " + strconv.Itoa(int(ack.HighestBid)))
+				break
+			}
+			if ID == -1 {
+				ID = ack.Id
+				log.Print("This client has ID: " , ID)
+			}
 			if err != nil {
 				log.Printf("Failed to send bid: %d", err)
 			} else {
-				log.Printf("Bid of %d sent successfully!", bidAmount)
+				if ack.HighestBid > bidAmount {
+					log.Printf("Bid is not large enough. Current largest bid is: %d", ack.HighestBid)
+				} else {
+					log.Printf("Bid sent successfully")
+				}
 			}
+		} else if input == "result" {
+			log.Printf("Requesting result")
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			result, err := client.Result(ctx, &pb.Sync{
+				Answer: true,
+			})
+
+			if err != nil {
+				log.Printf("Failed to get result")
+				continue
+			} else {
+				if result.Success {
+					log.Printf("Action is still going. Highest bid is: %d. From Client: %d", result.Amount, result.Id)
+				} else {
+					log.Printf("Auction is over highest bid was: %d. From Client: %d", result.Amount, result.Id)
+				}
+			}
+
 		} else {
 			fmt.Println("Unknown command. Type 'bid <amount>' to send a bid to the server.")
 		}
