@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -26,6 +27,7 @@ type server struct {
 	HighestClientID int32
 	auctionState    bool
 	clientNumber    int32
+	isPrimary bool
 }
 
 // Is called whenever a client bids
@@ -72,7 +74,6 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 }
 
 func (s *server) Result(ctx context.Context, sync *pb.Sync) (*pb.Results, error) {
-
 	notification := &pb.Results{
 		Id:         s.HighestClientID,
 		Success:     s.auctionState,
@@ -81,24 +82,6 @@ func (s *server) Result(ctx context.Context, sync *pb.Sync) (*pb.Results, error)
 	return notification, nil
 }
 
-/*
-	func (s *server) checkMap() {
-		s.mu.Lock()
-		defer s.mu.Lock()
-		for clientId, observer := range s.clients {
-			// Send a lightweight ping or check message
-			err := observer.Send(&pb.Ack{
-				Id:         clientId,
-				Answer:     false,        // Not an actual bid update
-				HighestBid: s.currentBid, // Current highest bid
-			})
-			if err != nil {
-				log.Printf("Client %d disconnected, removing from clients: %v", clientId, err)
-				delete(s.clients, clientId) // Remove the disconnected client
-			}
-		}
-	}
-*/
 func GoServe(grpcServer *grpc.Server, lis net.Listener) {
 	// Start the server
 	if err := grpcServer.Serve(lis); err != nil {
@@ -106,15 +89,18 @@ func GoServe(grpcServer *grpc.Server, lis net.Listener) {
 	}
 }
 
-func main() {
-	// Initialize the server
-	s := &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
+func isPortAvailable(port int) bool {
+    address := fmt.Sprintf("localhost:%d", port)
+    conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+    if err != nil {
+        return false // Connection failed, meaning no server is listening on this port
+    }
+    defer conn.Close() // Close the connection if it was successful
+    return true // Connection successful, meaning something is listening
+}
 
-	// Create a listener on TCP port 5050
-	lis, err := net.Listen("tcp", ":5050")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
+func main() {
+	if 
 
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer()
