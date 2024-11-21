@@ -45,7 +45,7 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 
 	if req.Id == -1 {
 		s.clientNumber++
-		log.Println("Client bid received from Client nr. " + strconv.Itoa(int(s.clientNumber)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
+		log.Println("Client bid received from NEW Client nr. " + strconv.Itoa(int(s.clientNumber)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
 	} else {
 		log.Println("Client bid received from Client nr. " + strconv.Itoa(int(req.Id)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
 	}
@@ -71,12 +71,12 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 	}
 }
 
-func (s *server) result() (*pb.Ack, error) {
+func (s *server) Result(ctx context.Context, sync *pb.Sync) (*pb.Results, error) {
 
-	notification := &pb.Ack{
+	notification := &pb.Results{
 		Id:         s.HighestClientID,
-		Answer:     s.auctionState,
-		HighestBid: s.currentBid,
+		Success:     s.auctionState,
+		Amount: s.currentBid,
 	}
 	return notification, nil
 }
@@ -156,7 +156,6 @@ func main() {
 			s.auctionState = false
 			s.mu.Unlock()
 			log.Println("Auction ended manually. No further bids are allowed.")
-			break
 		} else {
 			log.Println("Unknown command. Type 'end auction' to end the auction manually.")
 		}

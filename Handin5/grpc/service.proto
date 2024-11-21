@@ -16,7 +16,6 @@ message bidAmount {
 }
 
 message sync {
-    bool answer = 1;
 }
 
 message ack {

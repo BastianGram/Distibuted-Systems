@@ -56,6 +56,12 @@ func main() {
 				Id:     ID,        // Replace with appropriate Id if needed
 				Amount: bidAmount, // Use the extracted bid amount
 			})
+
+			if err != nil {
+				log.Printf("Failed to send bid: %d", err)
+				continue
+			} 
+
 			if !ack.Answer {
 				if ack.HighestBid == -1 {
 					log.Printf("Bid is not large enough")
@@ -68,19 +74,14 @@ func main() {
 				ID = ack.Id
 				log.Print("This client has ID: ", ID)
 			}
-			if err != nil {
-				log.Printf("Failed to send bid: %d", err)
-			} else {
-				log.Printf("Bid sent successfully")
-			}
+			
+			log.Printf("Bid sent successfully")
 		} else if input == "result" {
 			log.Printf("Requesting result")
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			result, err := client.Result(ctx, &pb.Sync{
-				Answer: true,
-			})
+			result, err := client.Result(ctx, &pb.Sync{})
 
 			if err != nil {
 				log.Printf("Failed to get result")
@@ -90,6 +91,7 @@ func main() {
 					log.Printf("Action is still going. Highest bid is: %d. From Client: %d", result.Amount, result.Id)
 				} else {
 					log.Printf("Auction is over highest bid was: %d. From Client: %d", result.Amount, result.Id)
+					break
 				}
 			}
 
