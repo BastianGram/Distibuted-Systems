@@ -13,6 +13,7 @@ import (
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/Handin5/Handin5/grpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
@@ -28,7 +29,7 @@ type server struct {
 	auctionState    bool
 	clientNumber    int32
 	isPrimary       bool
-	secondayServer  pb.ITUDatabaseServer
+	secondayServer  grpc.ClientConn
 }
 
 // Is called whenever a client bids
@@ -108,6 +109,8 @@ func (s *server) endAuction(ctx context.Context, req *pb.Sync) (*pb.Ack, error) 
 	s.mu.Lock()
 	s.auctionState = false
 	s.mu.Unlock()
+	req.Reset()
+	ctx.Done()
 	return &pb.Ack{
 		Id:         0,
 		Answer:     false,
@@ -120,22 +123,43 @@ func main() {
 	s := &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
 	var lis net.Listener
 	var err error
-	if isPortAvailable(5050) {
+	if !isPortAvailable(5050) {
 		// Create a listener on TCP port 5050
 		lis, err = net.Listen("tcp", ":5050")
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
+		log.Println("Server started. Listening on port 5050.")
+
 		s.isPrimary = true
 
 		log.Println("Primary server open. start second server within 10 seconds:")
 		time.Sleep(time.Second * 10)
-		lis, err = net.Listen("tcp", ":5051")
+
+		address := fmt.Sprintf("localhost:%d", 5051)
+		conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
+			log.Printf("Failed to connect to new node %d: %v", 5051, err)
+		}
+
+		s.secondayServer = conn
+
+
+
+
+		/*
+		lis1, err1 := net.Listen("tcp", ":5051")
+		if err1 != nil {
 			log.Fatalf("failed to listen at secondary: %v", err)
 		}
 		s.secondayServer = &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
-		pb.RegisterITUDatabaseServer(grpc.NewServer(), s.secondayServer)
+		grpc2 := grpc.NewServer()
+		pb.RegisterITUDatabaseServer(grpc2, s.secondayServer)
+		GoServe(grpc2, lis1)
+		*/
+
+
+
 		log.Println("connected to secondary server")
 
 	} else {
@@ -143,6 +167,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
+		log.Println("Server started. Listening on port 5051.")
+
 		s.isPrimary = false
 	}
 
@@ -150,7 +176,6 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterITUDatabaseServer(grpcServer, s)
 
-	log.Println("Server started. Listening on port 5050.")
 	log.Println("Auction started, awaiting bids")
 
 	// Start the gRPC server in a separate goroutine
@@ -165,6 +190,10 @@ func main() {
 		<-time.After(time.Duration(auctionDuration) * time.Second)
 		s.mu.Lock()
 		s.auctionState = false
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			s.auctionState = false
+			s.secondayServer.EndAuction(ctx, &pb.Sync{})
+			cancel()
 		s.mu.Unlock()
 		log.Println("Auction has ended. No further bids are allowed.")
 	}()
@@ -183,8 +212,10 @@ func main() {
 		// If user types "end auction", stop the auction
 		if input == "end auction" {
 			s.mu.Lock()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			s.auctionState = false
-			s.secondayServer.endAuction(&pb.Sync{})
+			s.secondayServer.EndAuction(ctx, &pb.Sync{})
+			cancel()
 			s.mu.Unlock()
 			log.Println("Auction ended manually. No further bids are allowed.")
 		} else {

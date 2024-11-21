@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ITUDatabase_Bid_FullMethodName    = "/ITUDatabase/bid"
-	ITUDatabase_Result_FullMethodName = "/ITUDatabase/result"
+	ITUDatabase_Bid_FullMethodName        = "/ITUDatabase/bid"
+	ITUDatabase_Result_FullMethodName     = "/ITUDatabase/result"
+	ITUDatabase_EndAuction_FullMethodName = "/ITUDatabase/endAuction"
 )
 
 // ITUDatabaseClient is the client API for ITUDatabase service.
@@ -29,6 +30,7 @@ const (
 type ITUDatabaseClient interface {
 	Bid(ctx context.Context, in *BidAmount, opts ...grpc.CallOption) (*Ack, error)
 	Result(ctx context.Context, in *Sync, opts ...grpc.CallOption) (*Results, error)
+	EndAuction(ctx context.Context, in *Sync, opts ...grpc.CallOption) (*Ack, error)
 }
 
 type iTUDatabaseClient struct {
@@ -59,12 +61,23 @@ func (c *iTUDatabaseClient) Result(ctx context.Context, in *Sync, opts ...grpc.C
 	return out, nil
 }
 
+func (c *iTUDatabaseClient) EndAuction(ctx context.Context, in *Sync, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, ITUDatabase_EndAuction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ITUDatabaseServer is the server API for ITUDatabase service.
 // All implementations must embed UnimplementedITUDatabaseServer
 // for forward compatibility.
 type ITUDatabaseServer interface {
 	Bid(context.Context, *BidAmount) (*Ack, error)
 	Result(context.Context, *Sync) (*Results, error)
+	EndAuction(context.Context, *Sync) (*Ack, error)
 	mustEmbedUnimplementedITUDatabaseServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedITUDatabaseServer) Bid(context.Context, *BidAmount) (*Ack, er
 }
 func (UnimplementedITUDatabaseServer) Result(context.Context, *Sync) (*Results, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Result not implemented")
+}
+func (UnimplementedITUDatabaseServer) EndAuction(context.Context, *Sync) (*Ack, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EndAuction not implemented")
 }
 func (UnimplementedITUDatabaseServer) mustEmbedUnimplementedITUDatabaseServer() {}
 func (UnimplementedITUDatabaseServer) testEmbeddedByValue()                     {}
@@ -138,6 +154,24 @@ func _ITUDatabase_Result_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ITUDatabase_EndAuction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Sync)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ITUDatabaseServer).EndAuction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ITUDatabase_EndAuction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ITUDatabaseServer).EndAuction(ctx, req.(*Sync))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ITUDatabase_ServiceDesc is the grpc.ServiceDesc for ITUDatabase service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var ITUDatabase_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "result",
 			Handler:    _ITUDatabase_Result_Handler,
+		},
+		{
+			MethodName: "endAuction",
+			Handler:    _ITUDatabase_EndAuction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

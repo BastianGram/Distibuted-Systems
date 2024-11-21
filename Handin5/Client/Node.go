@@ -24,7 +24,9 @@ type clientType struct {
 func dial(client *clientType) {
 
 	for otherPort := 5050; otherPort <= 5060; otherPort++ {
-		conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		address := fmt.Sprintf("localhost:%d", otherPort)
+		log.Printf("dialling to: %s", address)
+		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			continue
 		}
@@ -37,11 +39,13 @@ func checkMap(client *clientType) {
 		address := fmt.Sprintf("localhost:%d", port)
 		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
 		if err != nil {
-			log.Printf("Client %d has crashed, removing it from list...", port)
+			//log.Printf("Client %d has crashed, removing it from list...", port)
 			delete(client.dials, port)
 			continue
 		} else {
+			log.Printf("Using port, %d", port)
 			client.currentport = port
+			break		
 		}
 		conn.Close() // Close the connection if it was successful
 	}
