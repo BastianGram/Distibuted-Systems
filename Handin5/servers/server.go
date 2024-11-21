@@ -1,14 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"sync"
-	"bufio"
-	"os"
 
 	pb "github.com/BastianGram/Distibuted-Systems/tree/Handin5/Handin5/grpc"
 	"google.golang.org/grpc"
@@ -21,14 +21,14 @@ type Client struct {
 // Server struct to implement the MyServiceServer interface
 type server struct {
 	pb.ITUDatabaseServer
-	clients    map[int32]pb.ITUDatabase_BidServer
-	mu         sync.Mutex // to protect access to clients map
-	currentBid int32
+	clients      map[int32]pb.ITUDatabase_BidServer
+	mu           sync.Mutex // to protect access to clients map
+	currentBid   int32
 	auctionState bool
 }
 
 // Is called whenever a client bids
-func (s *server) bid(req *pb.BidAmount, stream pb.ITUDatabase_BidServer) error {
+func (s *server) Bid(req *pb.BidAmount, stream pb.ITUDatabase_BidServer) error {
 	//Locks and is only unlocked once the function ends
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,11 +82,12 @@ func (s *server) result() (*pb.Ack, error) {
 
 func (s *server) checkMap() {
 	s.mu.Lock()
+	defer s.mu.Lock()
 	for clientId, observer := range s.clients {
 		// Send a lightweight ping or check message
-		err := observer.Send(&pb.Ack {
+		err := observer.Send(&pb.Ack{
 			Id:         clientId,
-			Answer:     false, // Not an actual bid update
+			Answer:     false,        // Not an actual bid update
 			HighestBid: s.currentBid, // Current highest bid
 		})
 		if err != nil {
@@ -94,11 +95,10 @@ func (s *server) checkMap() {
 			delete(s.clients, clientId) // Remove the disconnected client
 		}
 	}
-	s.mu.Unlock()
 }
 
 func main() {
-	
+
 	// Initialize the server
 	s := &server{clients: make(map[int32]pb.ITUDatabase_BidServer), currentBid: -1, auctionState: true}
 
@@ -123,7 +123,7 @@ func main() {
 
 	// Listen for user input
 	fmt.Println("Type 'end auction' to prevent further bids")
-	
+
 	var input string
 
 	// Infinite loop to listen for user input
@@ -136,7 +136,7 @@ func main() {
 		if input == "end auction" {
 			s.auctionState = false
 			break
-			
+
 		} else {
 			fmt.Println("Unknown command. Type 'end auction' to prevent further bids")
 		}
