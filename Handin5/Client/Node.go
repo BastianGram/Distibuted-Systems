@@ -26,6 +26,8 @@ func main() {
 	// Create a new gRPC client
 	client := pb.NewITUDatabaseClient(conn)
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
 	// Main loop to process user input
 	for {
 		fmt.Print("Enter command: ")
@@ -47,7 +49,6 @@ func main() {
 
 			// Send the bid to the server
 			log.Printf("Sending bid of %d...", bidAmount)
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
 			_, err = client.Bid(ctx, &pb.BidAmount{
