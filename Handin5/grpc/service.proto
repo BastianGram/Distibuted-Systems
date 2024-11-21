@@ -34,4 +34,6 @@ service ITUDatabase {
     rpc bid (bidAmount) returns (ack) {}
 
     rpc result (sync) returns (results) {}
+
+    rpc endAuction (sync) returns (ack) {}
 }

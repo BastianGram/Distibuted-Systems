@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -15,18 +16,57 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type clientType struct {
+	dials       map[int32]pb.ITUDatabaseClient // Map over all server
+	currentport int32
+}
+
+func dial(client *clientType) {
+
+	for otherPort := 5050; otherPort <= 5060; otherPort++ {
+		conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			continue
+		}
+		client.dials[int32(otherPort)] = pb.NewITUDatabaseClient(conn)
+	}
+}
+
+func checkMap(client *clientType) {
+	for port := range client.dials {
+		address := fmt.Sprintf("localhost:%d", port)
+		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+		if err != nil {
+			log.Printf("Client %d has crashed, removing it from list...", port)
+			delete(client.dials, port)
+			continue
+		} else {
+			client.currentport = port
+		}
+		conn.Close() // Close the connection if it was successful
+	}
+}
+
 func main() {
 	// Establish connection to the server
-	conn, err := grpc.Dial("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	//conn, err := grpc.Dial("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	/*conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to server: %v", err)
 	}
-	defer conn.Close()
+	//defer conn.Close()
 
-	var ID int32 = -1
 
 	// Create a new gRPC client
-	client := pb.NewITUDatabaseClient(conn)
+	client := pb.NewITUDatabaseClient(conn)*/
+	var ID int32 = -1
+
+	client := &clientType{
+		dials: make(map[int32]pb.ITUDatabaseClient),
+	}
+
+	dial(client)
 
 	// Main loop to process user input
 	for {
@@ -49,10 +89,10 @@ func main() {
 
 			// Send the bid to the server
 			log.Printf("Sending bid of %d...", bidAmount)
+			checkMap(client)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-
-			ack, err := client.Bid(ctx, &pb.BidAmount{
+			ack, err := client.dials[client.currentport].Bid(ctx, &pb.BidAmount{
 				Id:     ID,        // Replace with appropriate Id if needed
 				Amount: bidAmount, // Use the extracted bid amount
 			})
@@ -60,7 +100,7 @@ func main() {
 			if err != nil {
 				log.Printf("Failed to send bid: %d", err)
 				continue
-			} 
+			}
 
 			if !ack.Answer {
 				if ack.HighestBid == -1 {
@@ -74,21 +114,21 @@ func main() {
 				ID = ack.Id
 				log.Print("This client has ID: ", ID)
 			}
-			
+
 			log.Printf("Bid sent successfully")
 		} else if input == "result" {
 			log.Printf("Requesting result")
+			checkMap(client)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-
-			result, err := client.Result(ctx, &pb.Sync{})
+			result, err := client.dials[client.currentport].Result(ctx, &pb.Sync{})
 
 			if err != nil {
 				log.Printf("Failed to get result")
 				continue
 			} else {
 				if result.Success {
-					log.Printf("Action is still going. Highest bid is: %d. From Client: %d", result.Amount, result.Id)
+					log.Printf("Auction is still going. Highest bid is: %d. From Client: %d", result.Amount, result.Id)
 				} else {
 					log.Printf("Auction is over highest bid was: %d. From Client: %d", result.Amount, result.Id)
 					break

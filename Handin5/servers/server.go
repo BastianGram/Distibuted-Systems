@@ -27,11 +27,16 @@ type server struct {
 	HighestClientID int32
 	auctionState    bool
 	clientNumber    int32
-	isPrimary bool
+	isPrimary       bool
+	secondayServer  pb.ITUDatabaseServer
 }
 
 // Is called whenever a client bids
 func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
+	if s.isPrimary {
+		s.secondayServer.Bid(ctx, req)
+	}
+
 	//Locks and is only unlocked once the function ends
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -75,9 +80,9 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 
 func (s *server) Result(ctx context.Context, sync *pb.Sync) (*pb.Results, error) {
 	notification := &pb.Results{
-		Id:         s.HighestClientID,
-		Success:     s.auctionState,
-		Amount: s.currentBid,
+		Id:      s.HighestClientID,
+		Success: s.auctionState,
+		Amount:  s.currentBid,
 	}
 	return notification, nil
 }
@@ -90,17 +95,56 @@ func GoServe(grpcServer *grpc.Server, lis net.Listener) {
 }
 
 func isPortAvailable(port int) bool {
-    address := fmt.Sprintf("localhost:%d", port)
-    conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-    if err != nil {
-        return false // Connection failed, meaning no server is listening on this port
-    }
-    defer conn.Close() // Close the connection if it was successful
-    return true // Connection successful, meaning something is listening
+	address := fmt.Sprintf("localhost:%d", port)
+	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+	if err != nil {
+		return false // Connection failed, meaning no server is listening on this port
+	}
+	defer conn.Close() // Close the connection if it was successful
+	return true        // Connection successful, meaning something is listening
+}
+
+func (s *server) endAuction(ctx context.Context, req *pb.Sync) (*pb.Ack, error) {
+	s.mu.Lock()
+	s.auctionState = false
+	s.mu.Unlock()
+	return &pb.Ack{
+		Id:         0,
+		Answer:     false,
+		HighestBid: 0,
+	}, nil
 }
 
 func main() {
-	if 
+
+	s := &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
+	var lis net.Listener
+	var err error
+	if isPortAvailable(5050) {
+		// Create a listener on TCP port 5050
+		lis, err = net.Listen("tcp", ":5050")
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+		s.isPrimary = true
+
+		log.Println("Primary server open. start second server within 10 seconds:")
+		time.Sleep(time.Second * 10)
+		lis, err = net.Listen("tcp", ":5051")
+		if err != nil {
+			log.Fatalf("failed to listen at secondary: %v", err)
+		}
+		s.secondayServer = &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
+		pb.RegisterITUDatabaseServer(grpc.NewServer(), s.secondayServer)
+		log.Println("connected to secondary server")
+
+	} else {
+		lis, err = net.Listen("tcp", ":5051")
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+		s.isPrimary = false
+	}
 
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer()
@@ -140,14 +184,11 @@ func main() {
 		if input == "end auction" {
 			s.mu.Lock()
 			s.auctionState = false
+			s.secondayServer.endAuction(&pb.Sync{})
 			s.mu.Unlock()
 			log.Println("Auction ended manually. No further bids are allowed.")
 		} else {
 			log.Println("Unknown command. Type 'end auction' to end the auction manually.")
 		}
 	}
-
-	// Ensure the gRPC server shuts down cleanly
-	grpcServer.GracefulStop()
-	log.Println("Server shut down.")
 }
