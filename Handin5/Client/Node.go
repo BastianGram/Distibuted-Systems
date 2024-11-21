@@ -57,7 +57,11 @@ func main() {
 				Amount: bidAmount, // Use the extracted bid amount
 			})
 			if !ack.Answer {
-				log.Printf("Bid failed")
+				if ack.HighestBid == -1 {
+					log.Printf("Bid is not large enough")
+					continue
+				}
+				log.Printf("Auction ended")
 				continue
 			}
 			if ID == -1 {
@@ -67,11 +71,7 @@ func main() {
 			if err != nil {
 				log.Printf("Failed to send bid: %d", err)
 			} else {
-				if ack.HighestBid > bidAmount {
-					log.Printf("Bid is not large enough. Current largest bid is: %d", ack.HighestBid)
-				} else {
-					log.Printf("Bid sent successfully")
-				}
+				log.Printf("Bid sent successfully")
 			}
 		} else if input == "result" {
 			log.Printf("Requesting result")

@@ -56,7 +56,7 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 		return &pb.Ack{
 			Id:         s.clientNumber,
 			Answer:     false,
-			HighestBid: s.currentBid,
+			HighestBid: -1,
 		}, nil
 		//Amount is larger than previous bid
 	} else {
@@ -127,7 +127,7 @@ func main() {
 	go GoServe(grpcServer, lis)
 
 	// Define auction duration
-	auctionDuration := 20 // Auction duration in seconds
+	auctionDuration := 200 // Auction duration in seconds
 
 	// Start a timer for the auction
 	go func() {
