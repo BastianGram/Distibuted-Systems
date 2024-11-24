@@ -29,18 +29,19 @@ type server struct {
 	auctionState    bool
 	clientNumber    int32
 	isPrimary       bool
-	secondayServer  grpc.ClientConn
+	secondayServer  pb.ITUDatabaseClient
 }
 
 // Is called whenever a client bids
 func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 	if s.isPrimary {
+		log.Printf("Sending to secondary")
 		s.secondayServer.Bid(ctx, req)
 	}
 
 	//Locks and is only unlocked once the function ends
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	//s.mu.Lock()
+	//defer s.mu.Unlock()
 
 	if !s.auctionState {
 		log.Printf("No more bids allowed, the auction is over")
@@ -52,7 +53,9 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 	}
 
 	if req.Id == -1 {
+		s.mu.Lock()
 		s.clientNumber++
+		s.mu.Unlock()
 		log.Println("Client bid received from NEW Client nr. " + strconv.Itoa(int(s.clientNumber)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
 	} else {
 		log.Println("Client bid received from Client nr. " + strconv.Itoa(int(req.Id)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
@@ -68,8 +71,10 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 		}, nil
 		//Amount is larger than previous bid
 	} else {
+		s.mu.Lock()
 		s.currentBid = req.Amount
 		s.HighestClientID = req.Id
+		s.mu.Unlock()
 		// Create the event notification
 		return &pb.Ack{
 			Id:         s.clientNumber,
@@ -142,7 +147,7 @@ func main() {
 			log.Printf("Failed to connect to new node %d: %v", 5051, err)
 		}
 
-		s.secondayServer = conn
+		s.secondayServer = pb.NewITUDatabaseClient(conn)
 
 
 
