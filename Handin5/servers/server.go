@@ -29,50 +29,52 @@ type server struct {
 	auctionState    bool
 	clientNumber    int32
 	isPrimary       bool
-	secondayServer  grpc.ClientConn
+	secondary pb.ITUDatabaseClient
 }
 
 // Is called whenever a client bids
 func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
+	var returnClientID int32 = -1
 	if s.isPrimary {
-		s.secondayServer.Bid(ctx, req)
+		s.secondary.Bid(ctx, req)
 	}
-
-	//Locks and is only unlocked once the function ends
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if !s.auctionState {
 		log.Printf("No more bids allowed, the auction is over")
 		return &pb.Ack{
-			Id:         s.clientNumber,
+			Id:         returnClientID,
 			Answer:     false,
 			HighestBid: s.currentBid,
 		}, nil
 	}
-
+	s.mu.Lock()
 	if req.Id == -1 {
 		s.clientNumber++
+		returnClientID = s.clientNumber
 		log.Println("Client bid received from NEW Client nr. " + strconv.Itoa(int(s.clientNumber)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
 	} else {
 		log.Println("Client bid received from Client nr. " + strconv.Itoa(int(req.Id)) + ", bid is: " + strconv.Itoa(int(req.Amount)))
 	}
+	s.mu.Unlock()
+
 
 	//Is amount too small
 	if req.Amount <= s.currentBid {
 		log.Printf("Bid is not large enough")
 		return &pb.Ack{
-			Id:         s.clientNumber,
-			Answer:     false,
+			Id:         returnClientID,
+			Answer:     true,
 			HighestBid: -1,
 		}, nil
 		//Amount is larger than previous bid
 	} else {
+		s.mu.Lock()
 		s.currentBid = req.Amount
 		s.HighestClientID = req.Id
+		s.mu.Unlock()
 		// Create the event notification
 		return &pb.Ack{
-			Id:         s.clientNumber,
+			Id:         returnClientID,
 			Answer:     true,
 			HighestBid: req.Amount,
 		}, nil
@@ -80,6 +82,8 @@ func (s *server) Bid(ctx context.Context, req *pb.BidAmount) (*pb.Ack, error) {
 }
 
 func (s *server) Result(ctx context.Context, sync *pb.Sync) (*pb.Results, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	notification := &pb.Results{
 		Id:      s.HighestClientID,
 		Success: s.auctionState,
@@ -105,15 +109,13 @@ func isPortAvailable(port int) bool {
 	return true        // Connection successful, meaning something is listening
 }
 
-func (s *server) endAuction(ctx context.Context, req *pb.Sync) (*pb.Ack, error) {
+func (s *server) endAuction(ctx context.Context, sync *pb.Sync) (*pb.Ack, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.auctionState = false
-	s.mu.Unlock()
-	req.Reset()
-	ctx.Done()
 	return &pb.Ack{
 		Id:         0,
-		Answer:     false,
+		Answer:     true,
 		HighestBid: 0,
 	}, nil
 }
@@ -133,34 +135,16 @@ func main() {
 
 		s.isPrimary = true
 
-		log.Println("Primary server open. start second server within 10 seconds:")
-		time.Sleep(time.Second * 10)
+		log.Println("Primary server open. start second server to complete setup")
 
 		address := fmt.Sprintf("localhost:%d", 5051)
 		conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Failed to connect to new node %d: %v", 5051, err)
+			log.Printf("Failed to connect to secondary %d: %v", 5051, err)
+		} else  {
+			log.Println("connected to secondary server")
 		}
-
-		s.secondayServer = conn
-
-
-
-
-		/*
-		lis1, err1 := net.Listen("tcp", ":5051")
-		if err1 != nil {
-			log.Fatalf("failed to listen at secondary: %v", err)
-		}
-		s.secondayServer = &server{currentBid: 0, HighestClientID: -1, auctionState: true, clientNumber: 0}
-		grpc2 := grpc.NewServer()
-		pb.RegisterITUDatabaseServer(grpc2, s.secondayServer)
-		GoServe(grpc2, lis1)
-		*/
-
-
-
-		log.Println("connected to secondary server")
+		s.secondary = pb.NewITUDatabaseClient(conn)
 
 	} else {
 		lis, err = net.Listen("tcp", ":5051")
@@ -192,7 +176,7 @@ func main() {
 		s.auctionState = false
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			s.auctionState = false
-			s.secondayServer.EndAuction(ctx, &pb.Sync{})
+			s.secondary.EndAuction(ctx, &pb.Sync{})
 			cancel()
 		s.mu.Unlock()
 		log.Println("Auction has ended. No further bids are allowed.")
@@ -213,9 +197,16 @@ func main() {
 		if input == "end auction" {
 			s.mu.Lock()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 			s.auctionState = false
-			s.secondayServer.EndAuction(ctx, &pb.Sync{})
-			cancel()
+			if (s.isPrimary) {
+				ack, err := s.secondary.EndAuction(ctx, &pb.Sync{})
+				if (err != nil){
+					log.Printf("Failed to send end auction to secondary: %s", err)
+				} else{
+					log.Printf("recieved acknoledgement %t", ack.Answer)
+				}
+			}
 			s.mu.Unlock()
 			log.Println("Auction ended manually. No further bids are allowed.")
 		} else {

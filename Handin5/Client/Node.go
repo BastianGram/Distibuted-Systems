@@ -17,57 +17,68 @@ import (
 )
 
 type clientType struct {
-	dials       map[int32]pb.ITUDatabaseClient // Map over all server
-	currentport int32
+	primarydial       pb.ITUDatabaseClient
+	secondarydial     pb.ITUDatabaseClient
+	primarydialport   int32
+	secondarydialport int32
+	currentport       int32
+	currentdial       pb.ITUDatabaseClient
 }
 
 func dial(client *clientType) {
 
-	for otherPort := 5050; otherPort <= 5060; otherPort++ {
-		address := fmt.Sprintf("localhost:%d", otherPort)
-		log.Printf("dialling to: %s", address)
-		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			continue
-		}
-		client.dials[int32(otherPort)] = pb.NewITUDatabaseClient(conn)
+	log.Println("Dialing..")
+	primaryaddress := fmt.Sprintf("localhost:%d", client.primarydialport)
+	secondaryaddress := fmt.Sprintf("localhost:%d", client.secondarydialport)
+
+	conn1, err1 := grpc.NewClient(primaryaddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err1 != nil {
+		log.Printf("Error connecting to primary")
 	}
+	client.primarydial = pb.NewITUDatabaseClient(conn1)
+	conn2, err2 := grpc.NewClient(secondaryaddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err2 != nil {
+		log.Printf("Error connecting to secondary")
+	}
+	client.secondarydial = pb.NewITUDatabaseClient(conn2)
+	log.Println("Dialing done")
 }
 
-func checkMap(client *clientType) {
-	for port := range client.dials {
-		address := fmt.Sprintf("localhost:%d", port)
-		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-		if err != nil {
-			//log.Printf("Client %d has crashed, removing it from list...", port)
-			delete(client.dials, port)
-			continue
-		} else {
-			log.Printf("Using port, %d", port)
-			client.currentport = port
-			break		
-		}
-		conn.Close() // Close the connection if it was successful
+func checkPort(client *clientType) {
+
+	address1 := fmt.Sprintf("localhost:%d", client.primarydialport)
+	_, err1 := net.DialTimeout("tcp", address1, 10*time.Second)
+	if err1 != nil {
+		log.Printf("Primary server has crashed")
+
+	} else {
+		log.Printf("Using port, %d", client.primarydialport)
+		client.currentport = client.primarydialport
+		client.currentdial = client.primarydial
+		return
 	}
+
+	address2 := fmt.Sprintf("localhost:%d", client.secondarydialport)
+	_, err2 := net.DialTimeout("tcp", address2, 10*time.Second)
+	if err2 != nil {
+		log.Printf("Secondary server has crashed")
+
+	} else {
+		log.Printf("Using port, %d", client.secondarydialport)
+		client.currentport = client.secondarydialport
+		client.currentdial = client.secondarydial
+		return
+	}
+
 }
 
 func main() {
-	// Establish connection to the server
-	//conn, err := grpc.Dial("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	/*conn, err := grpc.NewClient("localhost:5050", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Failed to connect to server: %v", err)
-	}
-	//defer conn.Close()
-
-
-	// Create a new gRPC client
-	client := pb.NewITUDatabaseClient(conn)*/
+	
 	var ID int32 = -1
 
 	client := &clientType{
-		dials: make(map[int32]pb.ITUDatabaseClient),
+		primarydialport:   5050,
+		secondarydialport: 5051,
 	}
 
 	dial(client)
@@ -92,40 +103,43 @@ func main() {
 			bidAmount := int32(bidFloat)
 
 			// Send the bid to the server
+
 			log.Printf("Sending bid of %d...", bidAmount)
-			checkMap(client)
+			checkPort(client)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			ack, err := client.dials[client.currentport].Bid(ctx, &pb.BidAmount{
+			ack, err := client.currentdial.Bid(ctx, &pb.BidAmount{
 				Id:     ID,        // Replace with appropriate Id if needed
 				Amount: bidAmount, // Use the extracted bid amount
 			})
+
+			if ID == -1 {
+				ID = ack.Id
+				log.Print("This client has ID: ", ID)
+			}
+
+			if !ack.Answer {
+				log.Printf("Auction ended")
+				continue
+			}
 
 			if err != nil {
 				log.Printf("Failed to send bid: %d", err)
 				continue
 			}
 
-			if !ack.Answer {
-				if ack.HighestBid == -1 {
-					log.Printf("Bid is not large enough")
-					continue
-				}
-				log.Printf("Auction ended")
+			if ack.HighestBid == -1 {
+				log.Printf("Bid is not large enough")
 				continue
-			}
-			if ID == -1 {
-				ID = ack.Id
-				log.Print("This client has ID: ", ID)
 			}
 
 			log.Printf("Bid sent successfully")
 		} else if input == "result" {
 			log.Printf("Requesting result")
-			checkMap(client)
+			checkPort(client)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			result, err := client.dials[client.currentport].Result(ctx, &pb.Sync{})
+			result, err := client.currentdial.Result(ctx, &pb.Sync{})
 
 			if err != nil {
 				log.Printf("Failed to get result")

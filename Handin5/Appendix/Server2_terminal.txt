@@ -1,0 +1,28 @@
+PS C:\Users\Tipskind_Overkill> cd C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers> go run server.go
+2024/11/24 13:06:43 Server started. Listening on port 5051.
+2024/11/24 13:06:43 Auction started, awaiting bids
+2024/11/24 13:06:43 Type 'end auction' to end the auction manually.
+2024/11/24 13:06:43 Auction will automatically end in 200 seconds.
+2024/11/24 13:06:56 Client bid received from NEW Client nr. 1, bid is: 10
+2024/11/24 13:07:02 Client bid received from NEW Client nr. 2, bid is: 8
+2024/11/24 13:07:02 Bid is not large enough
+2024/11/24 13:07:13 Client bid received from Client nr. 2, bid is: 12
+2024/11/24 13:07:25 Client bid received from NEW Client nr. 3, bid is: 2
+2024/11/24 13:07:25 Bid is not large enough
+2024/11/24 13:07:28 Client bid received from Client nr. 3, bid is: 14
+2024/11/24 13:07:54 Client bid received from Client nr. 2, bid is: 15
+2024/11/24 13:08:02 Client bid received from Client nr. 3, bid is: 20
+end auction
+2024/11/24 13:08:10 Auction ended manually. No further bids are allowed.
+2024/11/24 13:08:15 No more bids allowed, the auction is over
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal 0xc0000005 code=0x0 addr=0x20 pc=0xdd3f19]
+
+goroutine 11 [running]:
+main.main.func1()
+        C:/Users/Tipskind_Overkill/Documents/Repositorier/BDSA/Dist_Syst/Distibuted-Systems/Handin5/servers/server.go:179 +0x179
+created by main.main in goroutine 1
+        C:/Users/Tipskind_Overkill/Documents/Repositorier/BDSA/Dist_Syst/Distibuted-Systems/Handin5/servers/server.go:172 +0x6d0
+exit status 2
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers>

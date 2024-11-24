@@ -1,0 +1,26 @@
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\Client> go run Node.go
+2024/11/24 13:06:50 Dialing..
+2024/11/24 13:06:50 Dialing done
+Enter command: bid 10
+2024/11/24 13:06:56 Sending bid of 10...
+2024/11/24 13:06:56 Using port, 5050
+2024/11/24 13:06:56 This client has ID: 1
+2024/11/24 13:06:56 Bid sent successfully
+Enter command:
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\Client> go run Node.go
+2024/11/24 13:07:23 Dialing..
+2024/11/24 13:07:23 Dialing done
+Enter command: bid 2
+2024/11/24 13:07:25 Sending bid of 2...
+2024/11/24 13:07:25 Using port, 5050
+2024/11/24 13:07:25 This client has ID: 3
+2024/11/24 13:07:25 Bid is not large enough
+Enter command: bid 14
+2024/11/24 13:07:28 Sending bid of 14...
+2024/11/24 13:07:28 Using port, 5050
+2024/11/24 13:07:28 Bid sent successfully
+Enter command: bid 20
+2024/11/24 13:08:02 Sending bid of 20...
+2024/11/24 13:08:02 Primary server has crashed
+2024/11/24 13:08:02 Using port, 5051
+2024/11/24 13:08:02 Bid sent successfully

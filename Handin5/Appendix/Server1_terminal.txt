@@ -1,0 +1,18 @@
+
+PS C:\Users\Tipskind_Overkill> cd C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers> go run server.go
+2024/11/24 13:06:30 Server started. Listening on port 5050.
+2024/11/24 13:06:30 Primary server open. start second server to complete setup
+2024/11/24 13:06:30 connected to secondary server
+2024/11/24 13:06:30 Auction started, awaiting bids
+2024/11/24 13:06:30 Type 'end auction' to end the auction manually.
+2024/11/24 13:06:30 Auction will automatically end in 200 seconds.
+2024/11/24 13:06:56 Client bid received from NEW Client nr. 1, bid is: 10
+2024/11/24 13:07:02 Client bid received from NEW Client nr. 2, bid is: 8
+2024/11/24 13:07:02 Bid is not large enough
+2024/11/24 13:07:13 Client bid received from Client nr. 2, bid is: 12
+2024/11/24 13:07:25 Client bid received from NEW Client nr. 3, bid is: 2
+2024/11/24 13:07:25 Bid is not large enough
+2024/11/24 13:07:28 Client bid received from Client nr. 3, bid is: 14
+exit status 0xc000013a
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\servers>

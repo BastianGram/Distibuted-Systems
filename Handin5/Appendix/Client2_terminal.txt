@@ -1,0 +1,29 @@
+PS C:\Users\Tipskind_Overkill> cd C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\Client
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\Client> go run Node.go
+2024/11/24 13:06:54 Dialing..
+2024/11/24 13:06:54 Dialing done
+Enter command: bid 8
+2024/11/24 13:07:02 Sending bid of 8...
+2024/11/24 13:07:02 Using port, 5050
+2024/11/24 13:07:02 This client has ID: 2
+2024/11/24 13:07:02 Bid is not large enough
+Enter command: bid 12
+2024/11/24 13:07:13 Sending bid of 12...
+2024/11/24 13:07:13 Using port, 5050
+2024/11/24 13:07:13 Bid sent successfully
+Enter command: bid 15
+2024/11/24 13:07:54 Sending bid of 15...
+2024/11/24 13:07:54 Primary server has crashed
+2024/11/24 13:07:54 Using port, 5051
+2024/11/24 13:07:54 Bid sent successfully
+Enter command: bid 9
+2024/11/24 13:08:15 Sending bid of 9...
+2024/11/24 13:08:15 Primary server has crashed
+2024/11/24 13:08:15 Using port, 5051
+2024/11/24 13:08:15 Auction ended
+Enter command: result
+2024/11/24 13:08:21 Requesting result
+2024/11/24 13:08:21 Primary server has crashed
+2024/11/24 13:08:21 Using port, 5051
+2024/11/24 13:08:21 Auction is over highest bid was: 20. From Client: 3
+PS C:\Users\Tipskind_Overkill\Documents\Repositorier\BDSA\Dist_Syst\Distibuted-Systems\Handin5\Client>
