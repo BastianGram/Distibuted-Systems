@@ -21,4 +21,6 @@ From one of the client terminals type "bid <amount>" with amount being replaced 
 To get the results:
 From one of the client terminals type "result" and hit enter.
 
-It is possible to connect with multiple nodes at the same time, simply follow the "run a node" step once again.
+It is possible to connect with multiple clients at the same time, simply follow the "run a client" step once again.
+
+Append can be found under "Appendix" folder
